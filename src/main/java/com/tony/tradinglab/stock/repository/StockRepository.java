@@ -1,4 +1,4 @@
-package com.tony.tradinglab.stock.domain.repository;
+package com.tony.tradinglab.stock.repository;
 
 import com.tony.tradinglab.stock.domain.Stock;
 import org.springframework.data.jpa.repository.JpaRepository;
