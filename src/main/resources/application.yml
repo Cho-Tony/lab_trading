@@ -11,3 +11,13 @@ spring:
 
   flyway:
     enabled: true
+
+market-data:
+  twelve-data:
+    api-key: ${TWELVE_DATA_API_KEY}
+    base-url: https://api.twelvedata.com
+
+sec:
+  base-url: https://www.sec.gov
+  data-base-url: https://data.sec.gov
+  user-agent: ${SEC_USER_AGENT}
