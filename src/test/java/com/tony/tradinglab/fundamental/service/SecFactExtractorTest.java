@@ -1,6 +1,7 @@
 package com.tony.tradinglab.fundamental.service;
 
 import com.tony.tradinglab.fundamental.client.SecCompanyFactsClient;
+import com.tony.tradinglab.fundamental.domain.QuarterlyFact;
 import com.tony.tradinglab.fundamental.domain.SecFactPoint;
 import com.tony.tradinglab.fundamental.dto.SecCompanyFactsResponse;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,9 @@ class SecFactExtractorTest {
 
     @Autowired
     private SecFactExtractor factExtractor;
+
+    @Autowired
+    private SecQuarterNormalizer quarterNormalizer;
 
     @Test
     void extractAaplRevenue() {
@@ -42,5 +46,47 @@ class SecFactExtractorTest {
         revenues.stream()
                 .skip(Math.max(0, revenues.size() - 10))
                 .forEach(System.out::println);
+    }
+
+    @Test
+    void normalizeAaplQuarterlyRevenue() {
+
+        SecCompanyFactsResponse response =
+                companyFactsClient.getCompanyFacts("AAPL");
+
+        List<SecFactPoint> revenues =
+                factExtractor.extract(
+                        response,
+                        List.of(
+                                "RevenueFromContractWithCustomerExcludingAssessedTax",
+                                "Revenues",
+                                "SalesRevenueNet"
+                        ),
+                        "USD"
+                );
+
+        List<QuarterlyFact> quarters =
+                quarterNormalizer.normalize(revenues);
+
+        assertThat(quarters).isNotEmpty();
+
+        quarters.stream()
+                .skip(Math.max(0, quarters.size() - 12))
+                .forEach(q ->
+                        System.out.println(
+                                "FY" + q.fiscalYear()
+                                        + " " + q.fiscalQuarter()
+                                        + " | "
+                                        + q.startDate()
+                                        + " ~ "
+                                        + q.endDate()
+                                        + " | "
+                                        + q.value()
+                                        + " | filed="
+                                        + q.filedDate()
+                                        + " | derived="
+                                        + q.derived()
+                        )
+                );
     }
 }
