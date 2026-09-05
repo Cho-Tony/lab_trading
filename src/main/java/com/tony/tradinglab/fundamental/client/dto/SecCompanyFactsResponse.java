@@ -1,4 +1,4 @@
-package com.tony.tradinglab.fundamental.dto;
+package com.tony.tradinglab.fundamental.client.dto;
 
 import java.math.BigDecimal;
 import java.util.List;

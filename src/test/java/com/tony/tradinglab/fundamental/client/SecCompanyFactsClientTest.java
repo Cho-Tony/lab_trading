@@ -1,6 +1,6 @@
 package com.tony.tradinglab.fundamental.client;
 
-import com.tony.tradinglab.fundamental.dto.SecCompanyFactsResponse;
+import com.tony.tradinglab.fundamental.client.dto.SecCompanyFactsResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

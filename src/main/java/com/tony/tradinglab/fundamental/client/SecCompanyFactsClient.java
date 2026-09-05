@@ -1,6 +1,7 @@
 package com.tony.tradinglab.fundamental.client;
 
-import com.tony.tradinglab.fundamental.dto.SecCompanyFactsResponse;
+import com.tony.tradinglab.fundamental.client.dto.SecCompanyFactsResponse;
+import com.tony.tradinglab.fundamental.sec.SecTickerResolver;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;

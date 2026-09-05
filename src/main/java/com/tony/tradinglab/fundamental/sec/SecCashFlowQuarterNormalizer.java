@@ -1,4 +1,4 @@
-package com.tony.tradinglab.fundamental.service;
+package com.tony.tradinglab.fundamental.sec;
 
 import com.tony.tradinglab.fundamental.domain.QuarterlyFact;
 import com.tony.tradinglab.fundamental.domain.SecFactPoint;

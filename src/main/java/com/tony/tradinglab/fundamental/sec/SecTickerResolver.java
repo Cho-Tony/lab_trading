@@ -1,6 +1,6 @@
-package com.tony.tradinglab.fundamental.client;
+package com.tony.tradinglab.fundamental.sec;
 
-import com.tony.tradinglab.fundamental.dto.SecCompanyTickerEntry;
+import com.tony.tradinglab.fundamental.client.dto.SecCompanyTickerEntry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;

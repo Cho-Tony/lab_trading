@@ -1,7 +1,7 @@
-package com.tony.tradinglab.fundamental.service;
+package com.tony.tradinglab.fundamental.sec;
 
+import com.tony.tradinglab.fundamental.client.dto.SecCompanyFactsResponse;
 import com.tony.tradinglab.fundamental.domain.SecFactPoint;
-import com.tony.tradinglab.fundamental.dto.SecCompanyFactsResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;

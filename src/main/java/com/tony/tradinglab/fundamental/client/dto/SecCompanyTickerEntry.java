@@ -1,4 +1,4 @@
-package com.tony.tradinglab.fundamental.dto;
+package com.tony.tradinglab.fundamental.client.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
