@@ -33,20 +33,15 @@ class ForwardReturnCalculatorTest {
 
 
         /*
-         * 테스트 편의를 위해
-         * 253개 거래일 데이터를 만든다.
-         *
-         * 가격:
-         * Day 0   = 100
-         * Day 63  = 163
-         * Day 126 = 226
-         * Day 252 = 352
+         * index 0 ~ 252
+         * 총 253개 가격 데이터
          */
         for (int i = 0; i <= 252; i++) {
 
             prices.add(
                     price(
                             startDate.plusDays(i),
+
                             new BigDecimal(
                                     100 + i
                             )
@@ -70,10 +65,6 @@ class ForwardReturnCalculatorTest {
         );
 
 
-        /*
-         * (163 - 100) / 100
-         * = 63%
-         */
         assertThat(
                 result.return63dPct()
         ).isEqualByComparingTo(
@@ -81,9 +72,6 @@ class ForwardReturnCalculatorTest {
         );
 
 
-        /*
-         * 126%
-         */
         assertThat(
                 result.return126dPct()
         ).isEqualByComparingTo(
@@ -91,9 +79,6 @@ class ForwardReturnCalculatorTest {
         );
 
 
-        /*
-         * 252%
-         */
         assertThat(
                 result.return252dPct()
         ).isEqualByComparingTo(
@@ -104,24 +89,27 @@ class ForwardReturnCalculatorTest {
 
     private StockPrice price(
             LocalDate tradeDate,
-            BigDecimal adjustedClose
+            BigDecimal price
     ) {
 
-        StockPrice price =
-                new StockPrice();
+        return new StockPrice(
 
-        price.setTradeDate(
-                tradeDate
+                /*
+                 * 이 테스트에서는 Stock 객체를 사용하지 않음.
+                 * DB에 persist하는 테스트도 아니므로 null 가능.
+                 */
+                null,
+
+                tradeDate,
+
+                price,   // open
+                price,   // high
+                price,   // low
+                price,   // close
+
+                price,   // adjustedClose
+
+                1_000_000L
         );
-
-        price.setClose(
-                adjustedClose
-        );
-
-        price.setAdjustedClose(
-                adjustedClose
-        );
-
-        return price;
     }
 }
