@@ -21,21 +21,39 @@ public class SecFactExtractor {
             String unit
     ) {
 
-        Map<String, SecCompanyFactsResponse.Fact> usGaap =
-                response.facts().get(US_GAAP);
+        return extract(
+                response,
+                US_GAAP,
+                candidateTags,
+                unit
+        );
+    }
 
-        if (usGaap == null) {
+
+    public List<SecFactPoint> extract(
+            SecCompanyFactsResponse response,
+            String taxonomy,
+            List<String> candidateTags,
+            String unit
+    ) {
+
+        Map<String, SecCompanyFactsResponse.Fact> taxonomyFacts =
+                response.facts().get(taxonomy);
+
+        if (taxonomyFacts == null) {
             return List.of();
         }
+
 
         for (String tag : candidateTags) {
 
             SecCompanyFactsResponse.Fact fact =
-                    usGaap.get(tag);
+                    taxonomyFacts.get(tag);
 
             if (fact == null) {
                 continue;
             }
+
 
             List<SecCompanyFactsResponse.Unit> units =
                     fact.units().get(unit);
@@ -44,19 +62,34 @@ public class SecFactExtractor {
                 continue;
             }
 
+
             return units.stream()
+
                     .filter(this::isSupportedForm)
+
                     .filter(u -> u.val() != null)
+
                     .filter(u -> u.end() != null)
+
                     .filter(u -> u.filed() != null)
-                    .map(u -> toFactPoint(tag, u))
+
+                    .map(
+                            u ->
+                                    toFactPoint(
+                                            tag,
+                                            u
+                                    )
+                    )
+
                     .sorted(
                             Comparator.comparing(
                                     SecFactPoint::filedDate
                             )
                     )
+
                     .toList();
         }
+
 
         return List.of();
     }

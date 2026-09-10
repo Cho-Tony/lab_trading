@@ -1,4 +1,4 @@
-package com.tony.tradinglab.fundamental.dto;
+package com.tony.tradinglab.fundamental.client.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -12,6 +12,10 @@ public record FinancialStatementData(
 
         // 시장에 실제 공개된 날짜
         LocalDate filedDate,
+
+        // SEC fiscal period
+        Integer fiscalYear,
+        String fiscalQuarter,
 
         // Income Statement
         BigDecimal revenue,

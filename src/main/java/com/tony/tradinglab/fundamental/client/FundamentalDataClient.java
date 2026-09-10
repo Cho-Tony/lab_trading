@@ -1,6 +1,6 @@
 package com.tony.tradinglab.fundamental.client;
 
-import com.tony.tradinglab.fundamental.dto.FinancialStatementData;
+import com.tony.tradinglab.fundamental.client.dto.FinancialStatementData;
 
 import java.util.List;
 

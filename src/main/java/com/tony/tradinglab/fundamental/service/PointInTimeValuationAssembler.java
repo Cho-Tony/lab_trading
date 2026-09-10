@@ -189,7 +189,15 @@ public class PointInTimeValuationAssembler {
                                         )
                 )
 
-                .findFirst();
+                /*
+                 * 동일 FY/Q가 여러 개라면
+                 * asOfDate 당시 가장 최근 filing 사용.
+                 */
+                .max(
+                        Comparator.comparing(
+                                TtmCashFlow::filedDate
+                        )
+                );
     }
 
 

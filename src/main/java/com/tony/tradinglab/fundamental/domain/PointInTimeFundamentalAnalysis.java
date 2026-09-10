@@ -2,14 +2,14 @@ package com.tony.tradinglab.fundamental.domain;
 
 import java.time.LocalDate;
 
-public record PointInTimeValuationInputRequest(
+public record PointInTimeFundamentalAnalysis(
 
         Long stockId,
         String symbol,
 
-        LocalDate observationDate,
+        LocalDate asOfDate,
 
-        ValuationMetrics valuation,
+        TtmFinancials ttmFinancials,
 
         GrowthTrendAnalysis growth,
 
