@@ -6,6 +6,9 @@ import com.tony.tradinglab.fundamental.domain.*;
 import com.tony.tradinglab.fundamental.service.*;
 import com.tony.tradinglab.marketdata.client.MarketDataClient;
 import com.tony.tradinglab.marketdata.dto.DailyPrice;
+import com.tony.tradinglab.price.domain.StockPrice;
+import com.tony.tradinglab.price.repository.StockPriceRepository;
+import com.tony.tradinglab.price.service.MarketDataSyncService;
 import com.tony.tradinglab.stock.classification.domain.ClassificationSource;
 import com.tony.tradinglab.stock.classification.persistence.StockClassificationEntity;
 import com.tony.tradinglab.stock.classification.persistence.StockClassificationRepository;
@@ -46,6 +49,9 @@ public class RealFundamentalSmokeRunner
     private final PeerUniverseBuilder peerUniverseBuilder;
     private final StockClassificationRepository
             stockClassificationRepository;
+    private final MarketDataSyncService marketDataSyncService;
+
+    private final StockPriceRepository stockPriceRepository;
 
     public RealFundamentalSmokeRunner(
             FundamentalDataClient fundamentalDataClient,
@@ -63,7 +69,9 @@ public class RealFundamentalSmokeRunner
             StockRepository stockRepository,
             ValuationPeerSnapshotFactory valuationPeerSnapshotFactory,
             PeerUniverseBuilder peerUniverseBuilder,
-            StockClassificationRepository stockClassificationRepository
+            StockClassificationRepository stockClassificationRepository,
+            MarketDataSyncService marketDataSyncService,
+            StockPriceRepository stockPriceRepository
     ) {
 
         this.fundamentalDataClient =
@@ -113,6 +121,12 @@ public class RealFundamentalSmokeRunner
 
         this.stockClassificationRepository =
                 stockClassificationRepository;
+
+        this.marketDataSyncService =
+                marketDataSyncService;
+
+        this.stockPriceRepository =
+                stockPriceRepository;
     }
 
 
@@ -121,111 +135,113 @@ public class RealFundamentalSmokeRunner
             String... args
     ) {
 
-        String symbol =
-                "AAPL";
+//        String symbol =
+//                "AAPL";
+//
+//
+//        System.out.println();
+//        System.out.println(
+//                "======================================"
+//        );
+//
+//        System.out.println(
+//                " REAL FUNDAMENTAL SMOKE TEST"
+//        );
+//
+//        System.out.println(
+//                " SYMBOL = " + symbol
+//        );
+//
+//        System.out.println(
+//                "======================================"
+//        );
+//
+//
+//        List<FinancialStatementData> statements =
+//                fundamentalDataClient
+//                        .getFinancialStatements(
+//                                symbol
+//                        );
+//
+//
+//        System.out.println(
+//                "Received statements = "
+//                        + statements.size()
+//        );
+//
+//
+//        List<FinancialStatementData> sorted =
+//                statements.stream()
+//
+//                        .sorted(
+//                                Comparator.comparing(
+//                                        FinancialStatementData::periodEndDate
+//                                )
+//                        )
+//
+//                        .toList();
+//
+//
+//        sorted.stream()
+//
+//                .skip(
+//                        Math.max(
+//                                0,
+//                                sorted.size() - 8
+//                        )
+//                )
+//
+//                .forEach(
+//                        this::print
+//                );
+//
+//        printRealAnalysis(
+//                statements
+//        );
+//
+//        printTtmCalculatorAnalysis(
+//                statements
+//        );
+//
+//        printRevenueGrowthAnalysis(
+//                statements
+//        );
+//
+//        printGrowthAccelerationAnalysis(
+//                statements
+//        );
+//
+//        printGrowthTrendAnalysis(
+//                statements
+//        );
+//
+//        printProfitabilityAnalysis(
+//                statements
+//        );
+//
+//        printProfitabilityTrendAnalysis(
+//                statements
+//        );
+//
+//        printProfitabilityTrendFinalAnalysis(
+//                statements
+//        );
+//
+//        printPointInTimeFundamentalAnalysis(
+//                statements
+//        );
+//
+//        printRealMarketPrice();
+//
+//        printRealValuation(
+//                statements
+//        );
+//
+//        seedRealPeerStocks();
+//
+//        printRealPeerUniverse();
 
-
-        System.out.println();
-        System.out.println(
-                "======================================"
-        );
-
-        System.out.println(
-                " REAL FUNDAMENTAL SMOKE TEST"
-        );
-
-        System.out.println(
-                " SYMBOL = " + symbol
-        );
-
-        System.out.println(
-                "======================================"
-        );
-
-
-        List<FinancialStatementData> statements =
-                fundamentalDataClient
-                        .getFinancialStatements(
-                                symbol
-                        );
-
-
-        System.out.println(
-                "Received statements = "
-                        + statements.size()
-        );
-
-
-        List<FinancialStatementData> sorted =
-                statements.stream()
-
-                        .sorted(
-                                Comparator.comparing(
-                                        FinancialStatementData::periodEndDate
-                                )
-                        )
-
-                        .toList();
-
-
-        sorted.stream()
-
-                .skip(
-                        Math.max(
-                                0,
-                                sorted.size() - 8
-                        )
-                )
-
-                .forEach(
-                        this::print
-                );
-
-        printRealAnalysis(
-                statements
-        );
-
-        printTtmCalculatorAnalysis(
-                statements
-        );
-
-        printRevenueGrowthAnalysis(
-                statements
-        );
-
-        printGrowthAccelerationAnalysis(
-                statements
-        );
-
-        printGrowthTrendAnalysis(
-                statements
-        );
-
-        printProfitabilityAnalysis(
-                statements
-        );
-
-        printProfitabilityTrendAnalysis(
-                statements
-        );
-
-        printProfitabilityTrendFinalAnalysis(
-                statements
-        );
-
-        printPointInTimeFundamentalAnalysis(
-                statements
-        );
-
-        printRealMarketPrice();
-
-        printRealValuation(
-                statements
-        );
-
-        seedRealPeerStocks();
-
-        printRealPeerUniverse();
+        syncAaplPricesToDatabase();
 
         System.out.println(
                 "======================================"
@@ -2358,6 +2374,232 @@ public class RealFundamentalSmokeRunner
                             + seed.sector()
                             + " / "
                             + seed.industry()
+            );
+        }
+
+
+        System.out.println(
+                "======================================"
+        );
+    }
+
+    private void syncAaplPricesToDatabase() {
+
+        String symbol =
+                "AAPL";
+
+        String exchange =
+                "NASDAQ";
+
+        LocalDate startDate =
+                LocalDate.of(
+                        2026,
+                        1,
+                        1
+                );
+
+        LocalDate endDate =
+                LocalDate.of(
+                        2026,
+                        7,
+                        31
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " AAPL MARKET DATA DB SYNC"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        /*
+         * Stock master가 아직 없기 때문에
+         * 이번 smoke test에서 AAPL만 등록한다.
+         *
+         * 가격 데이터 자체는 아래 MarketDataSyncService가
+         * Twelve Data API에서 실제로 받아온다.
+         */
+        Stock stock =
+                stockRepository
+                        .findBySymbolAndExchange(
+                                symbol,
+                                exchange
+                        )
+
+                        .orElseGet(
+                                () ->
+                                        stockRepository.save(
+                                                new Stock(
+                                                        "AAPL",
+                                                        "Apple Inc.",
+                                                        "NASDAQ",
+                                                        "US",
+                                                        "USD"
+                                                )
+                                        )
+                        );
+
+
+        System.out.println(
+                "Stock ID       : "
+                        + stock.getId()
+        );
+
+
+        System.out.println(
+                "Symbol         : "
+                        + stock.getSymbol()
+        );
+
+
+        System.out.println(
+                "Sync Period    : "
+                        + startDate
+                        + " ~ "
+                        + endDate
+        );
+
+
+        /*
+         * 실제 Twelve Data API
+         *      ↓
+         * DailyPrice
+         *      ↓
+         * StockPrice
+         *      ↓
+         * MySQL INSERT
+         */
+        int insertedCount =
+                marketDataSyncService.sync(
+                        symbol,
+                        exchange,
+                        startDate,
+                        endDate
+                );
+
+
+        System.out.println(
+                "Newly Inserted : "
+                        + insertedCount
+        );
+
+
+        /*
+         * 실제 DB에서 다시 조회한다.
+         */
+        List<StockPrice> storedPrices =
+                stockPriceRepository
+                        .findByStockIdAndTradeDateBetweenOrderByTradeDateAsc(
+                                stock.getId(),
+                                startDate,
+                                endDate
+                        );
+
+
+        System.out.println(
+                "Stored Rows    : "
+                        + storedPrices.size()
+        );
+
+
+        if (!storedPrices.isEmpty()) {
+
+            StockPrice first =
+                    storedPrices.get(0);
+
+            StockPrice last =
+                    storedPrices.get(
+                            storedPrices.size() - 1
+                    );
+
+
+            System.out.println();
+            System.out.println(
+                    "----- FIRST DB PRICE -----"
+            );
+
+            System.out.println(
+                    "Date           : "
+                            + first.getTradeDate()
+            );
+
+            System.out.println(
+                    "Open           : "
+                            + first.getOpen()
+            );
+
+            System.out.println(
+                    "High           : "
+                            + first.getHigh()
+            );
+
+            System.out.println(
+                    "Low            : "
+                            + first.getLow()
+            );
+
+            System.out.println(
+                    "Close          : "
+                            + first.getClose()
+            );
+
+            System.out.println(
+                    "Adjusted Close : "
+                            + first.getAdjustedClose()
+            );
+
+            System.out.println(
+                    "Volume         : "
+                            + first.getVolume()
+            );
+
+
+            System.out.println();
+            System.out.println(
+                    "----- LAST DB PRICE -----"
+            );
+
+            System.out.println(
+                    "Date           : "
+                            + last.getTradeDate()
+            );
+
+            System.out.println(
+                    "Open           : "
+                            + last.getOpen()
+            );
+
+            System.out.println(
+                    "High           : "
+                            + last.getHigh()
+            );
+
+            System.out.println(
+                    "Low            : "
+                            + last.getLow()
+            );
+
+            System.out.println(
+                    "Close          : "
+                            + last.getClose()
+            );
+
+            System.out.println(
+                    "Adjusted Close : "
+                            + last.getAdjustedClose()
+            );
+
+            System.out.println(
+                    "Volume         : "
+                            + last.getVolume()
             );
         }
 
