@@ -1,11 +1,13 @@
 package com.tony.tradinglab.price.service;
 
 import com.tony.tradinglab.marketdata.client.MarketDataClient;
+import com.tony.tradinglab.marketdata.dto.DailyPrice;
 import com.tony.tradinglab.price.domain.StockPrice;
 import com.tony.tradinglab.price.repository.StockPriceRepository;
 import com.tony.tradinglab.stock.domain.Stock;
 import com.tony.tradinglab.stock.repository.StockRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.HashSet;
@@ -206,6 +208,183 @@ public class MarketDataSyncService {
 
                                                 price.adjustedClose(),
 
+                                                price.volume()
+                                        )
+                        )
+
+                        .toList();
+
+
+        if (newPrices.isEmpty()) {
+
+            return 0;
+        }
+
+
+        stockPriceRepository.saveAll(
+                newPrices
+        );
+
+
+        return newPrices.size();
+    }
+
+    public int syncRange(
+            String symbol,
+            String exchange,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+
+        if (symbol == null
+                || symbol.isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "symbol은 필수입니다."
+            );
+        }
+
+
+        if (exchange == null
+                || exchange.isBlank()) {
+
+            throw new IllegalArgumentException(
+                    "exchange는 필수입니다."
+            );
+        }
+
+
+        if (startDate == null
+                || endDate == null) {
+
+            throw new IllegalArgumentException(
+                    "startDate와 endDate는 필수입니다."
+            );
+        }
+
+
+        if (startDate.isAfter(endDate)) {
+
+            throw new IllegalArgumentException(
+                    "startDate는 endDate보다 늦을 수 없습니다."
+            );
+        }
+
+
+        String normalizedSymbol =
+                symbol.trim()
+                        .toUpperCase();
+
+        String normalizedExchange =
+                exchange.trim()
+                        .toUpperCase();
+
+
+        Stock stock =
+                stockRepository
+                        .findBySymbolAndExchange(
+                                normalizedSymbol,
+                                normalizedExchange
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Stock이 DB에 없습니다. "
+                                                        + normalizedSymbol
+                                                        + " / "
+                                                        + normalizedExchange
+                                        )
+                        );
+
+
+        /*
+         * 현재 요청 기간에 이미 저장되어 있는 날짜 확인.
+         */
+        List<StockPrice> existingPrices =
+                stockPriceRepository
+                        .findByStockIdAndTradeDateBetweenOrderByTradeDateAsc(
+                                stock.getId(),
+                                startDate,
+                                endDate
+                        );
+
+
+        Set<LocalDate> existingDates =
+                existingPrices.stream()
+
+                        .map(
+                                StockPrice::getTradeDate
+                        )
+
+                        .collect(
+                                java.util.stream.Collectors.toSet()
+                        );
+
+
+        /*
+         * 과거 backfill 용도이므로
+         * 요청한 기간 자체를 Twelve Data에 요청한다.
+         *
+         * endDate까지 포함시키기 위해 +1 day.
+         */
+        List<DailyPrice> dailyPrices =
+                marketDataClient
+                        .getDailyPrices(
+                                normalizedSymbol,
+                                startDate,
+                                endDate.plusDays(1)
+                        );
+
+
+        if (dailyPrices == null
+                || dailyPrices.isEmpty()) {
+
+            return 0;
+        }
+
+
+        List<StockPrice> newPrices =
+                dailyPrices.stream()
+
+                        .filter(
+                                price ->
+                                        price != null
+                                                && price.tradeDate() != null
+                        )
+
+                        .filter(
+                                price ->
+                                        !price.tradeDate()
+                                                .isBefore(startDate)
+                        )
+
+                        .filter(
+                                price ->
+                                        !price.tradeDate()
+                                                .isAfter(endDate)
+                        )
+
+                        .filter(
+                                price ->
+                                        !existingDates.contains(
+                                                price.tradeDate()
+                                        )
+                        )
+
+                        .map(
+                                price ->
+                                        new StockPrice(
+
+                                                stock,
+
+                                                price.tradeDate(),
+
+                                                price.open(),
+                                                price.high(),
+                                                price.low(),
+                                                price.close(),
+                                                price.adjustedClose(),
                                                 price.volume()
                                         )
                         )

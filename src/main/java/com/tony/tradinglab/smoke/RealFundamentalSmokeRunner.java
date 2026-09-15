@@ -3,6 +3,8 @@ package com.tony.tradinglab.smoke;
 import com.tony.tradinglab.fundamental.client.FundamentalDataClient;
 import com.tony.tradinglab.fundamental.client.dto.FinancialStatementData;
 import com.tony.tradinglab.fundamental.domain.*;
+import com.tony.tradinglab.fundamental.persistence.FinancialStatementEntity;
+import com.tony.tradinglab.fundamental.persistence.FinancialStatementRepository;
 import com.tony.tradinglab.fundamental.service.*;
 import com.tony.tradinglab.marketdata.client.MarketDataClient;
 import com.tony.tradinglab.marketdata.dto.DailyPrice;
@@ -14,6 +16,7 @@ import com.tony.tradinglab.stock.classification.persistence.StockClassificationE
 import com.tony.tradinglab.stock.classification.persistence.StockClassificationRepository;
 import com.tony.tradinglab.stock.domain.Stock;
 import com.tony.tradinglab.stock.repository.StockRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -28,6 +31,7 @@ import java.util.Optional;
 
 @Component
 @Profile("smoke")
+@RequiredArgsConstructor
 public class RealFundamentalSmokeRunner
         implements CommandLineRunner {
 
@@ -53,82 +57,16 @@ public class RealFundamentalSmokeRunner
 
     private final StockPriceRepository stockPriceRepository;
 
-    public RealFundamentalSmokeRunner(
-            FundamentalDataClient fundamentalDataClient,
-            TtmFinancialsCalculator ttmFinancialsCalculator,
-            RevenueGrowthCalculator revenueGrowthCalculator,
-            GrowthAccelerationCalculator growthAccelerationCalculator,
-            GrowthTrendAnalyzer growthTrendAnalyzer,
-            ProfitabilityCalculator profitabilityCalculator,
-            ProfitabilityTrendCalculator profitabilityTrendCalculator,
-            ProfitabilityTrendAnalyzer profitabilityTrendAnalyzer,
-            PointInTimeFundamentalAnalysisService pointInTimeFundamentalAnalysisService,
-            MarketDataClient marketDataClient,
-            ValuationMetricsCalculator valuationMetricsCalculator,
-            TtmCashFlowCalculator ttmCashFlowCalculator,
-            StockRepository stockRepository,
-            ValuationPeerSnapshotFactory valuationPeerSnapshotFactory,
-            PeerUniverseBuilder peerUniverseBuilder,
-            StockClassificationRepository stockClassificationRepository,
-            MarketDataSyncService marketDataSyncService,
-            StockPriceRepository stockPriceRepository
-    ) {
+    private final FundamentalDataSyncService
+            fundamentalDataSyncService;
 
-        this.fundamentalDataClient =
-                fundamentalDataClient;
+    private final FinancialStatementRepository
+            financialStatementRepository;
 
-        this.ttmFinancialsCalculator =
-                ttmFinancialsCalculator;
+    private final FinancialStatementQueryService
+            financialStatementQueryService;
 
-        this.revenueGrowthCalculator =
-                revenueGrowthCalculator;
-
-        this.growthAccelerationCalculator =
-                growthAccelerationCalculator;
-
-        this.growthTrendAnalyzer =
-                growthTrendAnalyzer;
-
-        this.profitabilityCalculator =
-                profitabilityCalculator;
-
-        this.profitabilityTrendCalculator =
-                profitabilityTrendCalculator;
-
-        this.profitabilityTrendAnalyzer =
-                profitabilityTrendAnalyzer;
-
-        this.pointInTimeFundamentalAnalysisService =
-                pointInTimeFundamentalAnalysisService;
-
-        this.marketDataClient =
-                marketDataClient;
-
-        this.valuationMetricsCalculator =
-                valuationMetricsCalculator;
-
-        this.ttmCashFlowCalculator =
-                ttmCashFlowCalculator;
-
-        this.stockRepository =
-                stockRepository;
-
-        this.valuationPeerSnapshotFactory =
-                valuationPeerSnapshotFactory;
-
-        this.peerUniverseBuilder =
-                peerUniverseBuilder;
-
-        this.stockClassificationRepository =
-                stockClassificationRepository;
-
-        this.marketDataSyncService =
-                marketDataSyncService;
-
-        this.stockPriceRepository =
-                stockPriceRepository;
-    }
-
+    private final FundamentalDataProvider fundamentalDataProvider;
 
     @Override
     public void run(
@@ -241,7 +179,11 @@ public class RealFundamentalSmokeRunner
 //
 //        printRealPeerUniverse();
 
-        syncAaplPricesToDatabase();
+//        syncAaplPricesToDatabase();
+
+//        syncAaplFundamentalsToDatabase();
+
+        analyzeAaplFromDatabaseOnly();
 
         System.out.println(
                 "======================================"
@@ -2602,6 +2544,531 @@ public class RealFundamentalSmokeRunner
                             + last.getVolume()
             );
         }
+
+
+        System.out.println(
+                "======================================"
+        );
+    }
+    private void syncAaplFundamentalsToDatabase() {
+
+        String symbol =
+                "AAPL";
+
+        String exchange =
+                "NASDAQ";
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " AAPL FUNDAMENTAL DB SYNC"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        /*
+         * AAPL Stock master 확인.
+         *
+         * 앞선 가격 DB sync에서 이미 생성된
+         * AAPL stock row를 그대로 사용한다.
+         */
+        Stock stock =
+                stockRepository
+                        .findBySymbolAndExchange(
+                                symbol,
+                                exchange
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "AAPL Stock이 DB에 없습니다."
+                                        )
+                        );
+
+
+        System.out.println(
+                "Stock ID       : "
+                        + stock.getId()
+        );
+
+        System.out.println(
+                "Symbol         : "
+                        + stock.getSymbol()
+        );
+
+
+        /*
+         * 실제 SEC API
+         *      ↓
+         * FinancialStatementData
+         *      ↓
+         * FinancialStatementEntity
+         *      ↓
+         * MySQL financial_statements
+         */
+        int insertedCount =
+                fundamentalDataSyncService.sync(
+                        symbol,
+                        exchange
+                );
+
+
+        System.out.println(
+                "Newly Inserted : "
+                        + insertedCount
+        );
+
+
+        /*
+         * 실제 DB에서 다시 조회
+         */
+        List<FinancialStatementEntity> stored =
+                financialStatementRepository
+                        .findByStockIdOrderByPeriodEndDateAscFiledDateAsc(
+                                stock.getId()
+                        );
+
+
+        System.out.println(
+                "Stored Rows    : "
+                        + stored.size()
+        );
+
+
+        if (stored.isEmpty()) {
+
+            System.out.println(
+                    "No financial statements stored."
+            );
+
+            System.out.println(
+                    "======================================"
+            );
+
+            return;
+        }
+
+
+        FinancialStatementEntity first =
+                stored.get(0);
+
+
+        FinancialStatementEntity latest =
+                stored.get(
+                        stored.size() - 1
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "----- FIRST DB FUNDAMENTAL -----"
+        );
+
+        printFinancialStatement(
+                first
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- LATEST DB FUNDAMENTAL -----"
+        );
+
+        printFinancialStatement(
+                latest
+        );
+
+
+        /*
+         * Point-in-Time 조회도 바로 확인.
+         *
+         * 2025-06-30 당시 시장에 공개되어 있던
+         * SEC 재무만 DB에서 가져온다.
+         */
+        LocalDate asOfDate =
+                LocalDate.of(
+                        2025,
+                        6,
+                        30
+                );
+
+
+        List<FinancialStatementEntity> pitStatements =
+                financialStatementRepository
+                        .findByStockIdAndFiledDateLessThanEqualOrderByPeriodEndDateAscFiledDateAsc(
+                                stock.getId(),
+                                asOfDate
+                        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- POINT-IN-TIME CHECK -----"
+        );
+
+        System.out.println(
+                "As Of Date     : "
+                        + asOfDate
+        );
+
+        System.out.println(
+                "Available Rows : "
+                        + pitStatements.size()
+        );
+
+
+        if (!pitStatements.isEmpty()) {
+
+            FinancialStatementEntity latestPit =
+                    pitStatements.get(
+                            pitStatements.size() - 1
+                    );
+
+
+            System.out.println(
+                    "Latest PIT FY : "
+                            + latestPit.getFiscalYear()
+                            + " "
+                            + latestPit.getFiscalQuarter()
+            );
+
+            System.out.println(
+                    "Period End    : "
+                            + latestPit.getPeriodEndDate()
+            );
+
+            System.out.println(
+                    "Filed Date    : "
+                            + latestPit.getFiledDate()
+            );
+
+            System.out.println(
+                    "Revenue       : "
+                            + latestPit.getRevenue()
+            );
+        }
+
+
+        System.out.println(
+                "======================================"
+        );
+    }
+
+    private void printFinancialStatement(
+            FinancialStatementEntity statement
+    ) {
+
+        System.out.println(
+                "Fiscal Period  : "
+                        + statement.getFiscalYear()
+                        + " "
+                        + statement.getFiscalQuarter()
+        );
+
+        System.out.println(
+                "Period End     : "
+                        + statement.getPeriodEndDate()
+        );
+
+        System.out.println(
+                "Filed Date     : "
+                        + statement.getFiledDate()
+        );
+
+        System.out.println(
+                "Revenue        : "
+                        + statement.getRevenue()
+        );
+
+        System.out.println(
+                "Operating Inc  : "
+                        + statement.getOperatingIncome()
+        );
+
+        System.out.println(
+                "Net Income     : "
+                        + statement.getNetIncome()
+        );
+
+        System.out.println(
+                "Assets         : "
+                        + statement.getTotalAssets()
+        );
+
+        System.out.println(
+                "Equity         : "
+                        + statement.getTotalEquity()
+        );
+
+        System.out.println(
+                "Debt           : "
+                        + statement.getTotalDebt()
+        );
+
+        System.out.println(
+                "Cash           : "
+                        + statement.getCash()
+        );
+
+        System.out.println(
+                "OCF            : "
+                        + statement.getOperatingCashFlow()
+        );
+
+        System.out.println(
+                "CapEx          : "
+                        + statement.getCapitalExpenditure()
+        );
+
+        System.out.println(
+                "Shares         : "
+                        + statement.getSharesOutstanding()
+        );
+    }
+
+
+    private void analyzeAaplFromDatabaseOnly() {
+
+        String symbol =
+                "AAPL";
+
+        String exchange =
+                "NASDAQ";
+
+        LocalDate asOfDate =
+                LocalDate.of(
+                        2026,
+                        7,
+                        31
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " AAPL FUNDAMENTAL PROVIDER ANALYSIS"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        Stock stock =
+                stockRepository
+                        .findBySymbolAndExchange(
+                                symbol,
+                                exchange
+                        )
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "AAPL Stock이 DB에 없습니다."
+                                        )
+                        );
+
+
+        /*
+         * 이제 QueryService를 직접 호출하지 않는다.
+         *
+         * FundamentalDataProvider가:
+         *
+         * 1. DB 확인
+         * 2. DB가 비어 있으면 SEC API sync
+         * 3. DB에서 PIT 데이터 조회
+         *
+         * 를 담당한다.
+         */
+        List<FinancialStatementData> statements =
+                fundamentalDataProvider
+                        .getAsOf(
+                                symbol,
+                                exchange,
+                                asOfDate
+                        );
+
+
+        System.out.println(
+                "As Of Date       : "
+                        + asOfDate
+        );
+
+        System.out.println(
+                "Statements       : "
+                        + statements.size()
+        );
+
+
+        if (statements.isEmpty()) {
+
+            System.out.println(
+                    "사용 가능한 재무 데이터가 없습니다."
+            );
+
+            return;
+        }
+
+
+        List<QuarterlyFinancials> quarterlyFinancials =
+                statements.stream()
+
+                        .map(
+                                data ->
+                                        new QuarterlyFinancials(
+
+                                                data.fiscalYear(),
+                                                data.fiscalQuarter(),
+
+                                                data.revenue(),
+                                                data.operatingIncome(),
+                                                data.netIncome(),
+
+                                                data.filedDate()
+                                        )
+                        )
+
+                        .toList();
+
+
+        List<QuarterlyFact> revenueFacts =
+                statements.stream()
+
+                        .filter(
+                                data ->
+                                        data.revenue() != null
+                        )
+
+                        .map(
+                                data ->
+                                        new QuarterlyFact(
+
+                                                "Revenue",
+
+                                                data.revenue(),
+
+                                                null,
+                                                data.periodEndDate(),
+                                                data.filedDate(),
+
+                                                data.fiscalYear(),
+                                                data.fiscalQuarter(),
+
+                                                false
+                                        )
+                        )
+
+                        .toList();
+
+
+        PointInTimeFundamentalContext context =
+                new PointInTimeFundamentalContext(
+
+                        stock.getId(),
+                        symbol,
+                        asOfDate,
+                        quarterlyFinancials
+                );
+
+
+        PointInTimeFundamentalAnalysis analysis =
+                pointInTimeFundamentalAnalysisService
+                        .analyze(
+                                context,
+                                revenueFacts
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Fundamental Analysis 실패"
+                                        )
+                        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- TTM -----"
+        );
+
+        System.out.println(
+                "Fiscal Period    : "
+                        + analysis
+                        .ttmFinancials()
+                        .fiscalYear()
+                        + " "
+                        + analysis
+                        .ttmFinancials()
+                        .fiscalQuarter()
+        );
+
+        System.out.println(
+                "TTM Revenue      : "
+                        + analysis
+                        .ttmFinancials()
+                        .revenue()
+        );
+
+        System.out.println(
+                "TTM Operating Inc: "
+                        + analysis
+                        .ttmFinancials()
+                        .operatingIncome()
+        );
+
+        System.out.println(
+                "TTM Net Income   : "
+                        + analysis
+                        .ttmFinancials()
+                        .netIncome()
+        );
+
+        System.out.println(
+                "TTM Filed Date   : "
+                        + analysis
+                        .ttmFinancials()
+                        .filedDate()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- GROWTH -----"
+        );
+
+        System.out.println(
+                analysis.growth()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- PROFITABILITY -----"
+        );
+
+        System.out.println(
+                analysis.profitability()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- COMPLETE ANALYSIS -----"
+        );
+
+        System.out.println(
+                analysis
+        );
 
 
         System.out.println(

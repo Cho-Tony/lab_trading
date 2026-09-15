@@ -23,4 +23,10 @@ public interface StockPriceRepository extends JpaRepository<StockPrice, Long> {
     Optional<StockPrice> findTopByStockIdOrderByTradeDateDesc(
             Long stockId
     );
+
+    // 특정 observationDate 이하에서 가장 최신
+    Optional<StockPrice> findTopByStockIdAndTradeDateLessThanEqualOrderByTradeDateDesc(
+            Long stockId,
+            LocalDate tradeDate
+    );
 }
