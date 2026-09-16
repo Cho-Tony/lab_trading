@@ -11,6 +11,7 @@ import com.tony.tradinglab.marketdata.dto.DailyPrice;
 import com.tony.tradinglab.price.domain.StockPrice;
 import com.tony.tradinglab.price.repository.StockPriceRepository;
 import com.tony.tradinglab.price.service.MarketDataSyncService;
+import com.tony.tradinglab.price.service.MarketPriceProvider;
 import com.tony.tradinglab.stock.classification.domain.ClassificationSource;
 import com.tony.tradinglab.stock.classification.persistence.StockClassificationEntity;
 import com.tony.tradinglab.stock.classification.persistence.StockClassificationRepository;
@@ -67,6 +68,10 @@ public class RealFundamentalSmokeRunner
             financialStatementQueryService;
 
     private final FundamentalDataProvider fundamentalDataProvider;
+
+    private final MarketPriceProvider marketPriceProvider;
+
+    private final PointInTimeValuationSnapshotService pointInTimeValuationSnapshotService;
 
     @Override
     public void run(
@@ -183,7 +188,13 @@ public class RealFundamentalSmokeRunner
 
 //        syncAaplFundamentalsToDatabase();
 
-        analyzeAaplFromDatabaseOnly();
+//        analyzeAaplFromDatabaseOnly();
+
+//        testAaplMarketPriceProvider();
+
+//        analyzeAaplValuationFromDatabase();
+
+        testPointInTimeValuationSnapshotService();
 
         System.out.println(
                 "======================================"
@@ -3075,6 +3086,683 @@ public class RealFundamentalSmokeRunner
                 "======================================"
         );
     }
+
+    private void testAaplMarketPriceProvider() {
+
+        String symbol =
+                "AAPL";
+
+        String exchange =
+                "NASDAQ";
+
+        LocalDate observationDate =
+                LocalDate.of(
+                        2026,
+                        7,
+                        31
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " AAPL MARKET PRICE PROVIDER"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        Optional<StockPrice> priceOptional =
+                marketPriceProvider.getAsOf(
+                        symbol,
+                        exchange,
+                        observationDate
+                );
+
+
+        if (priceOptional.isEmpty()) {
+
+            System.out.println(
+                    "Price not available."
+            );
+
+            return;
+        }
+
+
+        StockPrice price =
+                priceOptional.get();
+
+
+        System.out.println(
+                "Observation Date : "
+                        + observationDate
+        );
+
+        System.out.println(
+                "Actual Price Date: "
+                        + price.getTradeDate()
+        );
+
+        System.out.println(
+                "Open             : "
+                        + price.getOpen()
+        );
+
+        System.out.println(
+                "High             : "
+                        + price.getHigh()
+        );
+
+        System.out.println(
+                "Low              : "
+                        + price.getLow()
+        );
+
+        System.out.println(
+                "Close            : "
+                        + price.getClose()
+        );
+
+        System.out.println(
+                "Adjusted Close   : "
+                        + price.getAdjustedClose()
+        );
+
+        System.out.println(
+                "Volume           : "
+                        + price.getVolume()
+        );
+
+
+        System.out.println(
+                "======================================"
+        );
+    }
+
+    private void analyzeAaplValuationFromDatabase() {
+
+        String symbol =
+                "AAPL";
+
+        String exchange =
+                "NASDAQ";
+
+        LocalDate observationDate =
+                LocalDate.of(
+                        2026,
+                        7,
+                        31
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " AAPL DB-CENTERED VALUATION"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        /*
+         * 1. Stock master
+         */
+        Stock stock =
+                stockRepository
+                        .findBySymbolAndExchange(
+                                symbol,
+                                exchange
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "AAPL Stock이 DB에 없습니다."
+                                        )
+                        );
+
+
+        /*
+         * 2. Fundamental
+         *
+         * DB 우선.
+         * DB가 완전히 비어 있을 때만
+         * FundamentalDataProvider가 SEC sync를 수행한다.
+         */
+        List<FinancialStatementData> statements =
+                fundamentalDataProvider
+                        .getAsOf(
+                                symbol,
+                                exchange,
+                                observationDate
+                        );
+
+
+        if (statements.isEmpty()) {
+
+            throw new IllegalStateException(
+                    "사용 가능한 AAPL 재무 데이터가 없습니다."
+            );
+        }
+
+
+        /*
+         * 3. QuarterlyFinancials
+         */
+        List<QuarterlyFinancials> quarterlyFinancials =
+                statements.stream()
+
+                        .map(
+                                data ->
+                                        new QuarterlyFinancials(
+
+                                                data.fiscalYear(),
+                                                data.fiscalQuarter(),
+
+                                                data.revenue(),
+                                                data.operatingIncome(),
+                                                data.netIncome(),
+
+                                                data.filedDate()
+                                        )
+                        )
+
+                        .toList();
+
+
+        /*
+         * 4. Growth 계산용 Revenue Fact
+         */
+        List<QuarterlyFact> revenueFacts =
+                statements.stream()
+
+                        .filter(
+                                data ->
+                                        data.revenue() != null
+                        )
+
+                        .map(
+                                data ->
+                                        new QuarterlyFact(
+
+                                                "Revenue",
+
+                                                data.revenue(),
+
+                                                null,
+                                                data.periodEndDate(),
+                                                data.filedDate(),
+
+                                                data.fiscalYear(),
+                                                data.fiscalQuarter(),
+
+                                                false
+                                        )
+                        )
+
+                        .toList();
+
+
+        /*
+         * 5. Fundamental Analysis
+         */
+        PointInTimeFundamentalContext context =
+                new PointInTimeFundamentalContext(
+
+                        stock.getId(),
+                        symbol,
+                        observationDate,
+                        quarterlyFinancials
+                );
+
+
+        PointInTimeFundamentalAnalysis fundamental =
+                pointInTimeFundamentalAnalysisService
+                        .analyze(
+                                context,
+                                revenueFacts
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Fundamental Analysis 실패"
+                                        )
+                        );
+
+
+        TtmFinancials ttmFinancials =
+                fundamental.ttmFinancials();
+
+
+        /*
+         * 6. DB 재무에서 Quarterly Cash Flow 생성
+         */
+        List<QuarterlyCashFlow> quarterlyCashFlows =
+                statements.stream()
+
+                        .filter(
+                                data ->
+                                        data.operatingCashFlow() != null
+                                                && data.capitalExpenditure() != null
+                        )
+
+                        .map(
+                                data -> {
+
+                                    BigDecimal freeCashFlow =
+                                            data.operatingCashFlow()
+                                                    .subtract(
+                                                            data.capitalExpenditure()
+                                                    );
+
+
+                                    return new QuarterlyCashFlow(
+
+                                            data.fiscalYear(),
+                                            data.fiscalQuarter(),
+
+                                            data.operatingCashFlow(),
+                                            data.capitalExpenditure(),
+                                            freeCashFlow,
+
+                                            data.filedDate()
+                                    );
+                                }
+                        )
+
+                        .toList();
+
+
+        /*
+         * 7. TTM Cash Flow
+         */
+        TtmCashFlow ttmCashFlow =
+                ttmCashFlowCalculator
+                        .calculate(
+                                quarterlyCashFlows
+                        )
+
+                        .stream()
+
+                        .filter(
+                                cashFlow ->
+                                        cashFlow.fiscalYear()
+                                                .equals(
+                                                        ttmFinancials.fiscalYear()
+                                                )
+                        )
+
+                        .filter(
+                                cashFlow ->
+                                        cashFlow.fiscalQuarter()
+                                                .equals(
+                                                        ttmFinancials.fiscalQuarter()
+                                                )
+                        )
+
+                        .max(
+                                Comparator.comparing(
+                                        TtmCashFlow::filedDate
+                                )
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "해당 TTM 기간의 Cash Flow가 없습니다."
+                                        )
+                        );
+
+
+        /*
+         * 8. observationDate 당시 사용 가능한
+         *    가장 최근 Shares Outstanding
+         */
+        BigDecimal sharesOutstanding =
+                statements.stream()
+
+                        .filter(
+                                data ->
+                                        data.sharesOutstanding() != null
+                        )
+
+                        .max(
+                                Comparator.comparing(
+                                        FinancialStatementData::filedDate
+                                )
+                        )
+
+                        .map(
+                                FinancialStatementData::sharesOutstanding
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "Shares Outstanding이 없습니다."
+                                        )
+                        );
+
+
+        /*
+         * 9. Market Price
+         *
+         * DB 우선.
+         * 필요한 가격이 없을 때만
+         * MarketPriceProvider가 Twelve Data backfill을 수행한다.
+         */
+        StockPrice price =
+                marketPriceProvider
+                        .getAsOf(
+                                symbol,
+                                exchange,
+                                observationDate
+                        )
+
+                        .orElseThrow(
+                                () ->
+                                        new IllegalStateException(
+                                                "시장 가격을 찾을 수 없습니다."
+                                        )
+                        );
+
+
+        /*
+         * Valuation에는 adjustedClose가 아니라
+         * 해당 시점의 실제 Close를 사용한다.
+         */
+        BigDecimal sharePrice =
+                price.getClose();
+
+
+        /*
+         * 10. Valuation
+         */
+        ValuationMetrics valuation =
+                valuationMetricsCalculator
+                        .calculate(
+
+                                ttmFinancials,
+                                ttmCashFlow,
+
+                                price.getTradeDate(),
+
+                                sharePrice,
+                                sharesOutstanding
+                        );
+
+
+        System.out.println(
+                "Observation Date : "
+                        + observationDate
+        );
+
+        System.out.println(
+                "Price Date       : "
+                        + price.getTradeDate()
+        );
+
+        System.out.println(
+                "Share Price      : "
+                        + sharePrice
+        );
+
+        System.out.println(
+                "Shares           : "
+                        + sharesOutstanding
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- TTM -----"
+        );
+
+        System.out.println(
+                "Fiscal Period    : "
+                        + ttmFinancials.fiscalYear()
+                        + " "
+                        + ttmFinancials.fiscalQuarter()
+        );
+
+        System.out.println(
+                "Revenue          : "
+                        + ttmFinancials.revenue()
+        );
+
+        System.out.println(
+                "Net Income       : "
+                        + ttmFinancials.netIncome()
+        );
+
+        System.out.println(
+                "OCF              : "
+                        + ttmCashFlow.operatingCashFlow()
+        );
+
+        System.out.println(
+                "CapEx            : "
+                        + ttmCashFlow.capitalExpenditure()
+        );
+
+        System.out.println(
+                "FCF              : "
+                        + ttmCashFlow.freeCashFlow()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- VALUATION -----"
+        );
+
+        System.out.println(
+                "Market Cap       : "
+                        + valuation.marketCap()
+        );
+
+        System.out.println(
+                "P/E              : "
+                        + valuation.peRatio()
+        );
+
+        System.out.println(
+                "P/S              : "
+                        + valuation.psRatio()
+        );
+
+        System.out.println(
+                "P/FCF            : "
+                        + valuation.priceToFcfRatio()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                valuation
+        );
+
+
+        System.out.println(
+                "======================================"
+        );
+    }
+
+    private void testPointInTimeValuationSnapshotService() {
+
+        String symbol =
+                "AAPL";
+
+        String exchange =
+                "NASDAQ";
+
+        LocalDate observationDate =
+                LocalDate.of(
+                        2026,
+                        7,
+                        31
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " POINT-IN-TIME VALUATION SNAPSHOT"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        Optional<ValuationPeerSnapshotInput> result =
+                pointInTimeValuationSnapshotService
+                        .analyze(
+                                symbol,
+                                exchange,
+                                observationDate
+                        );
+
+
+        if (result.isEmpty()) {
+
+            System.out.println(
+                    "Valuation Snapshot 생성 실패"
+            );
+
+            System.out.println(
+                    "======================================"
+            );
+
+            return;
+        }
+
+
+        ValuationPeerSnapshotInput snapshot =
+                result.get();
+
+
+        System.out.println(
+                "Stock ID         : "
+                        + snapshot.stockId()
+        );
+
+        System.out.println(
+                "Symbol           : "
+                        + snapshot.symbol()
+        );
+
+        System.out.println(
+                "Observation Date : "
+                        + snapshot.observationDate()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- VALUATION -----"
+        );
+
+        System.out.println(
+                "Price Date       : "
+                        + snapshot
+                        .valuation()
+                        .priceDate()
+        );
+
+        System.out.println(
+                "Share Price      : "
+                        + snapshot
+                        .valuation()
+                        .sharePrice()
+        );
+
+        System.out.println(
+                "Shares           : "
+                        + snapshot
+                        .valuation()
+                        .sharesOutstanding()
+        );
+
+        System.out.println(
+                "Market Cap       : "
+                        + snapshot
+                        .valuation()
+                        .marketCap()
+        );
+
+        System.out.println(
+                "P/E              : "
+                        + snapshot
+                        .valuation()
+                        .peRatio()
+        );
+
+        System.out.println(
+                "P/S              : "
+                        + snapshot
+                        .valuation()
+                        .psRatio()
+        );
+
+        System.out.println(
+                "P/FCF            : "
+                        + snapshot
+                        .valuation()
+                        .priceToFcfRatio()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- GROWTH -----"
+        );
+
+        System.out.println(
+                snapshot.growth()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- PROFITABILITY -----"
+        );
+
+        System.out.println(
+                snapshot.profitability()
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- COMPLETE SNAPSHOT -----"
+        );
+
+        System.out.println(
+                snapshot
+        );
+
+
+        System.out.println(
+                "======================================"
+        );
+    }
+
 }
 
 

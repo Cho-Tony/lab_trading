@@ -32,28 +32,24 @@ public class ValuationPeerSnapshotInputFactory {
 
 
         /*
-         * valuation 자체가 다른 날짜의 가격을 기준으로
-         * 계산된 값이면 사용하면 안 된다.
+         * 가격 날짜가 observationDate보다 미래면
+         * look-ahead bias.
          *
-         * 예:
-         *
-         * observationDate = 2025-06-30
-         * valuation.priceDate = 2025-09-30
-         *
-         * → 미래 valuation이므로 제외.
+         * 주말 / 휴일에는 직전 거래일 가격을
+         * 사용하는 것이 정상적이므로
+         * observationDate와 반드시 같을 필요는 없다.
          */
         if (valuation.priceDate() == null
-                || !valuation.priceDate()
-                .equals(observationDate)) {
+                || valuation.priceDate()
+                .isAfter(observationDate)) {
 
             return Optional.empty();
         }
 
 
         /*
-         * valuation 계산에 사용한 재무정보가
-         * observationDate 이후에 공시된 것이면
-         * look-ahead bias.
+         * 재무정보 역시 observationDate 이후
+         * 공개된 정보를 사용하면 안 된다.
          */
         if (valuation.filedDate() != null
                 && valuation.filedDate()
@@ -68,11 +64,8 @@ public class ValuationPeerSnapshotInputFactory {
 
                         stockId,
                         symbol,
-
                         observationDate,
-
                         valuation,
-
                         growth,
                         profitability
                 )
