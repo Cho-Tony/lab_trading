@@ -1,207 +1,365 @@
-package com.tony.tradinglab.smoke;
+package com.tony.tradinglab.fundamental.service;
 
-import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshotInput;
-import com.tony.tradinglab.fundamental.service.PointInTimeValuationSnapshotService;
+import com.tony.tradinglab.fundamental.client.dto.FinancialStatementData;
+import com.tony.tradinglab.fundamental.domain.*;
+import com.tony.tradinglab.price.domain.StockPrice;
+import com.tony.tradinglab.price.service.MarketPriceProvider;
+import com.tony.tradinglab.stock.domain.Stock;
+import com.tony.tradinglab.stock.repository.StockRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Profile;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
-@Component
-@Profile("smoke")
+@Service
 @RequiredArgsConstructor
-public class RealFundamentalSmokeRunner
-        implements CommandLineRunner {
+public class PointInTimeValuationSnapshotService {
 
-    private final PointInTimeValuationSnapshotService
-            pointInTimeValuationSnapshotService;
+    private final StockRepository stockRepository;
+
+    private final FundamentalDataProvider fundamentalDataProvider;
+
+    private final MarketPriceProvider marketPriceProvider;
+
+    private final PointInTimeFundamentalAnalysisService
+            fundamentalAnalysisService;
+
+    private final TtmCashFlowCalculator
+            ttmCashFlowCalculator;
+
+    private final ValuationMetricsCalculator
+            valuationMetricsCalculator;
+
+    private final ValuationPeerSnapshotInputFactory
+            snapshotInputFactory;
 
 
-    @Override
-    public void run(
-            String... args
+    public Optional<ValuationPeerSnapshotInput> analyze(
+            String symbol,
+            String exchange,
+            LocalDate observationDate
     ) {
 
-        testPointInTimeValuationSnapshotService();
+        if (symbol == null
+                || symbol.isBlank()
+                || exchange == null
+                || exchange.isBlank()
+                || observationDate == null) {
+
+            return Optional.empty();
+        }
 
 
-        System.out.println(
-                "======================================"
-        );
+        String normalizedSymbol =
+                symbol.trim()
+                        .toUpperCase();
 
-        System.out.println(
-                " END"
-        );
-
-        System.out.println(
-                "======================================"
-        );
-    }
+        String normalizedExchange =
+                exchange.trim()
+                        .toUpperCase();
 
 
-    private void testPointInTimeValuationSnapshotService() {
-
-        String symbol =
-                "AAPL";
-
-        String exchange =
-                "NASDAQ";
-
-        LocalDate observationDate =
-                LocalDate.of(
-                        2026,
-                        7,
-                        31
-                );
+        /*
+         * 1. Stock master
+         */
+        Optional<Stock> stockOptional =
+                stockRepository
+                        .findBySymbolAndExchange(
+                                normalizedSymbol,
+                                normalizedExchange
+                        );
 
 
-        System.out.println();
-        System.out.println(
-                "======================================"
-        );
+        if (stockOptional.isEmpty()) {
 
-        System.out.println(
-                " POINT-IN-TIME VALUATION SNAPSHOT"
-        );
-
-        System.out.println(
-                "======================================"
-        );
+            return Optional.empty();
+        }
 
 
-        Optional<ValuationPeerSnapshotInput> result =
-                pointInTimeValuationSnapshotService
-                        .analyze(
-                                symbol,
-                                exchange,
+        Stock stock =
+                stockOptional.get();
+
+
+        /*
+         * 2. Fundamental
+         *
+         * DB 우선.
+         * DB가 완전히 비어 있으면 Provider가
+         * SEC sync 후 DB에서 다시 읽는다.
+         */
+        List<FinancialStatementData> statements =
+                fundamentalDataProvider
+                        .getAsOf(
+                                normalizedSymbol,
+                                normalizedExchange,
                                 observationDate
                         );
 
 
-        if (result.isEmpty()) {
+        if (statements.isEmpty()) {
 
-            System.out.println(
-                    "Valuation Snapshot 생성 실패"
-            );
-
-            System.out.println(
-                    "======================================"
-            );
-
-            return;
+            return Optional.empty();
         }
 
 
-        ValuationPeerSnapshotInput snapshot =
-                result.get();
+        /*
+         * 3. 기존 Fundamental Analyzer용 입력
+         */
+        List<QuarterlyFinancials> quarterlyFinancials =
+                statements.stream()
+
+                        .map(
+                                data ->
+                                        new QuarterlyFinancials(
+
+                                                data.fiscalYear(),
+                                                data.fiscalQuarter(),
+
+                                                data.revenue(),
+                                                data.operatingIncome(),
+                                                data.netIncome(),
+
+                                                data.filedDate()
+                                        )
+                        )
+
+                        .toList();
 
 
-        System.out.println(
-                "Stock ID         : "
-                        + snapshot.stockId()
-        );
+        List<QuarterlyFact> revenueFacts =
+                statements.stream()
 
-        System.out.println(
-                "Symbol           : "
-                        + snapshot.symbol()
-        );
+                        .filter(
+                                data ->
+                                        data.revenue() != null
+                        )
 
-        System.out.println(
-                "Observation Date : "
-                        + snapshot.observationDate()
-        );
+                        .map(
+                                data ->
+                                        new QuarterlyFact(
 
+                                                "Revenue",
 
-        System.out.println();
-        System.out.println(
-                "----- VALUATION -----"
-        );
+                                                data.revenue(),
 
-        System.out.println(
-                "Price Date       : "
-                        + snapshot
-                        .valuation()
-                        .priceDate()
-        );
+                                                null,
+                                                data.periodEndDate(),
+                                                data.filedDate(),
 
-        System.out.println(
-                "Share Price      : "
-                        + snapshot
-                        .valuation()
-                        .sharePrice()
-        );
+                                                data.fiscalYear(),
+                                                data.fiscalQuarter(),
 
-        System.out.println(
-                "Shares           : "
-                        + snapshot
-                        .valuation()
-                        .sharesOutstanding()
-        );
+                                                false
+                                        )
+                        )
 
-        System.out.println(
-                "Market Cap       : "
-                        + snapshot
-                        .valuation()
-                        .marketCap()
-        );
-
-        System.out.println(
-                "P/E              : "
-                        + snapshot
-                        .valuation()
-                        .peRatio()
-        );
-
-        System.out.println(
-                "P/S              : "
-                        + snapshot
-                        .valuation()
-                        .psRatio()
-        );
-
-        System.out.println(
-                "P/FCF            : "
-                        + snapshot
-                        .valuation()
-                        .priceToFcfRatio()
-        );
+                        .toList();
 
 
-        System.out.println();
-        System.out.println(
-                "----- GROWTH -----"
-        );
+        PointInTimeFundamentalContext context =
+                new PointInTimeFundamentalContext(
 
-        System.out.println(
-                snapshot.growth()
-        );
-
-
-        System.out.println();
-        System.out.println(
-                "----- PROFITABILITY -----"
-        );
-
-        System.out.println(
-                snapshot.profitability()
-        );
+                        stock.getId(),
+                        normalizedSymbol,
+                        observationDate,
+                        quarterlyFinancials
+                );
 
 
-        System.out.println();
-        System.out.println(
-                "----- COMPLETE SNAPSHOT -----"
-        );
+        Optional<PointInTimeFundamentalAnalysis>
+                fundamentalOptional =
+                fundamentalAnalysisService
+                        .analyze(
+                                context,
+                                revenueFacts
+                        );
 
-        System.out.println(
-                snapshot
-        );
+
+        if (fundamentalOptional.isEmpty()) {
+
+            return Optional.empty();
+        }
 
 
-        System.out.println(
-                "======================================"
-        );
+        PointInTimeFundamentalAnalysis fundamental =
+                fundamentalOptional.get();
+
+
+        TtmFinancials ttmFinancials =
+                fundamental.ttmFinancials();
+
+
+        /*
+         * 4. Cash Flow → TTM FCF
+         */
+        List<QuarterlyCashFlow> quarterlyCashFlows =
+                statements.stream()
+
+                        .filter(
+                                data ->
+                                        data.operatingCashFlow() != null
+                                                && data.capitalExpenditure() != null
+                        )
+
+                        .map(
+                                data -> {
+
+                                    BigDecimal freeCashFlow =
+                                            data.operatingCashFlow()
+                                                    .subtract(
+                                                            data.capitalExpenditure()
+                                                    );
+
+
+                                    return new QuarterlyCashFlow(
+
+                                            data.fiscalYear(),
+                                            data.fiscalQuarter(),
+
+                                            data.operatingCashFlow(),
+                                            data.capitalExpenditure(),
+                                            freeCashFlow,
+
+                                            data.filedDate()
+                                    );
+                                }
+                        )
+
+                        .toList();
+
+
+        Optional<TtmCashFlow> ttmCashFlowOptional =
+                ttmCashFlowCalculator
+                        .calculate(
+                                quarterlyCashFlows
+                        )
+
+                        .stream()
+
+                        .filter(
+                                cashFlow ->
+                                        cashFlow.fiscalYear()
+                                                .equals(
+                                                        ttmFinancials
+                                                                .fiscalYear()
+                                                )
+                        )
+
+                        .filter(
+                                cashFlow ->
+                                        cashFlow.fiscalQuarter()
+                                                .equals(
+                                                        ttmFinancials
+                                                                .fiscalQuarter()
+                                                )
+                        )
+
+                        .max(
+                                Comparator.comparing(
+                                        TtmCashFlow::filedDate
+                                )
+                        );
+
+
+        if (ttmCashFlowOptional.isEmpty()) {
+
+            return Optional.empty();
+        }
+
+
+        /*
+         * 5. PIT Shares Outstanding
+         */
+        Optional<BigDecimal> sharesOptional =
+                statements.stream()
+
+                        .filter(
+                                data ->
+                                        data.sharesOutstanding() != null
+                        )
+
+                        .max(
+                                Comparator.comparing(
+                                        FinancialStatementData::filedDate
+                                )
+                        )
+
+                        .map(
+                                FinancialStatementData::sharesOutstanding
+                        );
+
+
+        if (sharesOptional.isEmpty()) {
+
+            return Optional.empty();
+        }
+
+
+        /*
+         * 6. Market Price
+         *
+         * DB에 usable price가 있으면 API 호출 X.
+         * 없으면 MarketPriceProvider가 backfill한다.
+         */
+        Optional<StockPrice> priceOptional =
+                marketPriceProvider
+                        .getAsOf(
+                                normalizedSymbol,
+                                normalizedExchange,
+                                observationDate
+                        );
+
+
+        if (priceOptional.isEmpty()) {
+
+            return Optional.empty();
+        }
+
+
+        StockPrice price =
+                priceOptional.get();
+
+
+        /*
+         * 7. Valuation
+         */
+        ValuationMetrics valuation =
+                valuationMetricsCalculator
+                        .calculate(
+
+                                ttmFinancials,
+
+                                ttmCashFlowOptional.get(),
+
+                                price.getTradeDate(),
+
+                                price.getClose(),
+
+                                sharesOptional.get()
+                        );
+
+
+        /*
+         * 8. Peer Snapshot Input
+         *
+         * 아직 sector / industry는 여기서 붙이지 않는다.
+         * 다음 Assembler 단계에서 PIT classification을 결합한다.
+         */
+        return snapshotInputFactory
+                .create(
+
+                        stock.getId(),
+                        normalizedSymbol,
+                        observationDate,
+
+                        valuation,
+
+                        fundamental.growth(),
+                        fundamental.profitability()
+                );
     }
 }

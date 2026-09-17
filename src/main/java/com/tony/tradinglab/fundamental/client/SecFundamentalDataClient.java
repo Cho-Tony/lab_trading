@@ -128,15 +128,62 @@ public class SecFundamentalDataClient
                         symbol
                 );
 
+        List<SecFactPoint> revenueFacts =
+                factExtractor.extract(
+                        response,
+                        REVENUE_TAGS,
+                        "USD"
+                );
+
+        System.out.println();
+        System.out.println(
+                "===== NVDA RAW REVENUE FACTS ====="
+        );
+
+        for (SecFactPoint fact : revenueFacts) {
+
+            System.out.println(
+                    "tag="
+                            + fact.tag()
+                            + " | start="
+                            + fact.startDate()
+                            + " | end="
+                            + fact.endDate()
+                            + " | filed="
+                            + fact.filedDate()
+                            + " | FY="
+                            + fact.fiscalYear()
+                            + " | FP="
+                            + fact.fiscalPeriod()
+                            + " | form="
+                            + fact.form()
+            );
+        }
+
+        System.out.println(
+                "RAW COUNT = "
+                        + revenueFacts.size()
+        );
+
 
         List<QuarterlyFact> revenues =
                 quarterNormalizer.normalize(
-                        factExtractor.extract(
-                                response,
-                                REVENUE_TAGS,
-                                "USD"
-                        )
+                        revenueFacts
                 );
+
+        System.out.println(
+                "NORMALIZED COUNT = "
+                        + revenues.size()
+        );
+
+//        List<QuarterlyFact> revenues =
+//                quarterNormalizer.normalize(
+//                        factExtractor.extract(
+//                                response,
+//                                REVENUE_TAGS,
+//                                "USD"
+//                        )
+//                );
 
 
         List<QuarterlyFact> operatingIncomes =

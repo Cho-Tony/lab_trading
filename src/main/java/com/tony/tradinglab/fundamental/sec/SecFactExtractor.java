@@ -37,61 +37,124 @@ public class SecFactExtractor {
             String unit
     ) {
 
-        Map<String, SecCompanyFactsResponse.Fact> taxonomyFacts =
-                response.facts().get(taxonomy);
+        if (response == null
+                || response.facts() == null
+                || taxonomy == null
+                || candidateTags == null
+                || candidateTags.isEmpty()
+                || unit == null) {
 
-        if (taxonomyFacts == null) {
             return List.of();
         }
 
 
-        for (String tag : candidateTags) {
-
-            SecCompanyFactsResponse.Fact fact =
-                    taxonomyFacts.get(tag);
-
-            if (fact == null) {
-                continue;
-            }
+        Map<String, SecCompanyFactsResponse.Fact> taxonomyFacts =
+                response.facts().get(
+                        taxonomy
+                );
 
 
-            List<SecCompanyFactsResponse.Unit> units =
-                    fact.units().get(unit);
+        if (taxonomyFacts == null
+                || taxonomyFacts.isEmpty()) {
 
-            if (units == null || units.isEmpty()) {
-                continue;
-            }
-
-
-            return units.stream()
-
-                    .filter(this::isSupportedForm)
-
-                    .filter(u -> u.val() != null)
-
-                    .filter(u -> u.end() != null)
-
-                    .filter(u -> u.filed() != null)
-
-                    .map(
-                            u ->
-                                    toFactPoint(
-                                            tag,
-                                            u
-                                    )
-                    )
-
-                    .sorted(
-                            Comparator.comparing(
-                                    SecFactPoint::filedDate
-                            )
-                    )
-
-                    .toList();
+            return List.of();
         }
 
 
-        return List.of();
+        /*
+         * 중요:
+         *
+         * candidateTags 중 첫 번째로 발견된 tag만
+         * 사용하는 것이 아니라,
+         *
+         * 회사가 시기별로 서로 다른 XBRL tag를
+         * 사용했을 가능성을 고려하여
+         * 모든 candidate tag의 fact를 합친다.
+         *
+         * 예:
+         *
+         * RevenueFromContractWithCustomerExcludingAssessedTax
+         * SalesRevenueNet
+         * Revenues
+         *
+         * NVDA처럼 과거/현재 공시에서 tag가 달라질 수 있다.
+         */
+        return candidateTags.stream()
+
+                .flatMap(
+                        tag -> {
+
+                            SecCompanyFactsResponse.Fact fact =
+                                    taxonomyFacts.get(
+                                            tag
+                                    );
+
+
+                            if (fact == null
+                                    || fact.units() == null) {
+
+                                return java.util.stream.Stream.empty();
+                            }
+
+
+                            List<SecCompanyFactsResponse.Unit> units =
+                                    fact.units().get(
+                                            unit
+                                    );
+
+
+                            if (units == null
+                                    || units.isEmpty()) {
+
+                                return java.util.stream.Stream.empty();
+                            }
+
+
+                            return units.stream()
+
+                                    .filter(
+                                            this::isSupportedForm
+                                    )
+
+                                    .filter(
+                                            u ->
+                                                    u.val() != null
+                                    )
+
+                                    .filter(
+                                            u ->
+                                                    u.end() != null
+                                    )
+
+                                    .filter(
+                                            u ->
+                                                    u.filed() != null
+                                    )
+
+                                    .map(
+                                            u ->
+                                                    toFactPoint(
+                                                            tag,
+                                                            u
+                                                    )
+                                    );
+                        }
+                )
+
+                /*
+                 * PIT 관점에서 먼저 공시된 데이터를
+                 * 앞쪽에 둔다.
+                 *
+                 * 동일 filedDate에서는 candidateTags에
+                 * 지정된 tag 순서가 유지된다.
+                 */
+                .sorted(
+                        Comparator.comparing(
+                                SecFactPoint::filedDate
+                        )
+                )
+
+                .toList();
     }
 
     public Optional<SecFactPoint> findLatestAvailable(
