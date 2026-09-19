@@ -1,6 +1,9 @@
 package com.tony.tradinglab.fundamental.service;
 
-import com.tony.tradinglab.fundamental.domain.*;
+import com.tony.tradinglab.fundamental.domain.PeerUniverse;
+import com.tony.tradinglab.fundamental.domain.RobustZScoreMetric;
+import com.tony.tradinglab.fundamental.domain.RobustZScoreValuationAssessment;
+import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshot;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -12,14 +15,8 @@ import java.util.function.Function;
 @Component
 public class RobustZScoreValuationEvaluator {
 
-    /*
-     * Modified Z-score scaling constant.
-     *
-     * Median/MAD를 정규분포의
-     * 일반 Z-score scale과 맞추기 위한 통계 상수.
-     *
-     * 튜닝용 threshold가 아님.
-     */
+    private static final int MIN_VALID_PEER_COUNT = 10;
+
     private static final BigDecimal MODIFIED_Z_SCALE =
             new BigDecimal("0.67448975");
 
@@ -70,14 +67,12 @@ public class RobustZScoreValuationEvaluator {
 
 
         return new RobustZScoreValuationAssessment(
-
                 universe.target().symbol(),
 
                 calculateMetric(
                         universe.target()
                                 .valuation()
                                 .peRatio(),
-
                         peerPeValues
                 ),
 
@@ -85,7 +80,6 @@ public class RobustZScoreValuationEvaluator {
                         universe.target()
                                 .valuation()
                                 .psRatio(),
-
                         peerPsValues
                 ),
 
@@ -93,7 +87,6 @@ public class RobustZScoreValuationEvaluator {
                         universe.target()
                                 .valuation()
                                 .priceToFcfRatio(),
-
                         peerPriceToFcfValues
                 )
         );
@@ -105,17 +98,15 @@ public class RobustZScoreValuationEvaluator {
             List<BigDecimal> peerValues
     ) {
 
-        if (peerValues.isEmpty()) {
+        if (peerValues.size()
+                < MIN_VALID_PEER_COUNT) {
 
             return new RobustZScoreMetric(
-
                     targetValue,
-
                     null,
                     null,
                     null,
-
-                    0
+                    peerValues.size()
             );
         }
 
@@ -135,7 +126,6 @@ public class RobustZScoreValuationEvaluator {
 
         BigDecimal robustZScore =
                 calculateRobustZScore(
-
                         targetValue,
                         median,
                         mad
@@ -143,14 +133,10 @@ public class RobustZScoreValuationEvaluator {
 
 
         return new RobustZScoreMetric(
-
                 targetValue,
-
                 median,
                 mad,
-
                 robustZScore,
-
                 peerValues.size()
         );
     }
@@ -162,29 +148,11 @@ public class RobustZScoreValuationEvaluator {
             BigDecimal mad
     ) {
 
-        /*
-         * Target valuation 자체가 없는 경우
-         *
-         * 예:
-         * 적자 회사의 P/E
-         */
         if (targetValue == null
-                || targetValue.compareTo(
-                BigDecimal.ZERO
-        ) <= 0) {
-
-            return null;
-        }
-
-
-        /*
-         * MAD = 0이면
-         * 분모가 0이므로 Robust Z-score 계산 불가능.
-         */
-        if (mad == null
-                || mad.compareTo(
-                BigDecimal.ZERO
-        ) == 0) {
+                || targetValue.compareTo(BigDecimal.ZERO) <= 0
+                || median == null
+                || mad == null
+                || mad.compareTo(BigDecimal.ZERO) == 0) {
 
             return null;
         }
@@ -197,17 +165,14 @@ public class RobustZScoreValuationEvaluator {
 
 
         return MODIFIED_Z_SCALE
-
                 .multiply(
                         deviation
                 )
-
                 .divide(
                         mad,
                         CALCULATION_SCALE,
                         RoundingMode.HALF_UP
                 )
-
                 .setScale(
                         SCORE_SCALE,
                         RoundingMode.HALF_UP
@@ -222,14 +187,12 @@ public class RobustZScoreValuationEvaluator {
 
         List<BigDecimal> deviations =
                 values.stream()
-
                         .map(
                                 value ->
                                         value.subtract(
                                                 median
                                         ).abs()
                         )
-
                         .toList();
 
 
@@ -244,17 +207,16 @@ public class RobustZScoreValuationEvaluator {
     ) {
 
         if (values.isEmpty()) {
+
             return null;
         }
 
 
         List<BigDecimal> sorted =
                 values.stream()
-
                         .sorted(
                                 Comparator.naturalOrder()
                         )
-
                         .toList();
 
 
@@ -265,9 +227,6 @@ public class RobustZScoreValuationEvaluator {
                 size / 2;
 
 
-        /*
-         * 홀수
-         */
         if (size % 2 == 1) {
 
             return sorted.get(
@@ -276,11 +235,6 @@ public class RobustZScoreValuationEvaluator {
         }
 
 
-        /*
-         * 짝수
-         *
-         * 가운데 두 값의 평균
-         */
         BigDecimal left =
                 sorted.get(
                         middle - 1
@@ -309,26 +263,25 @@ public class RobustZScoreValuationEvaluator {
             Function<ValuationPeerSnapshot, BigDecimal> extractor
     ) {
 
-        return peers.stream()
+        if (peers == null
+                || peers.isEmpty()) {
 
+            return List.of();
+        }
+
+
+        return peers.stream()
                 .filter(
                         peer ->
                                 peer != null
                                         && peer.valuation() != null
                 )
-
-                .map(
-                        extractor
-                )
-
+                .map(extractor)
                 .filter(
                         value ->
                                 value != null
-                                        && value.compareTo(
-                                        BigDecimal.ZERO
-                                ) > 0
+                                        && value.compareTo(BigDecimal.ZERO) > 0
                 )
-
                 .toList();
     }
 }

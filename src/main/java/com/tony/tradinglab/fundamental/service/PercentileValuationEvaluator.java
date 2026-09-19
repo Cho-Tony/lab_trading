@@ -13,7 +13,10 @@ import java.util.function.Function;
 @Component
 public class PercentileValuationEvaluator {
 
+    private static final int MIN_VALID_PEER_COUNT = 10;
+
     private static final int SCALE = 2;
+
 
     public PercentileValuationAssessment evaluate(
             PeerUniverse universe
@@ -73,7 +76,6 @@ public class PercentileValuationEvaluator {
 
 
         return new PercentileValuationAssessment(
-
                 universe.target().symbol(),
 
                 calculatePercentile(
@@ -103,19 +105,20 @@ public class PercentileValuationEvaluator {
             Function<ValuationPeerSnapshot, BigDecimal> extractor
     ) {
 
-        return peers.stream()
+        if (peers == null
+                || peers.isEmpty()) {
 
+            return List.of();
+        }
+
+
+        return peers.stream()
                 .filter(
                         peer ->
                                 peer != null
                                         && peer.valuation() != null
                 )
-
                 .map(extractor)
-
-                /*
-                 * null 및 의미 없는 0/음수 valuation 제거
-                 */
                 .filter(
                         value ->
                                 value != null
@@ -123,7 +126,6 @@ public class PercentileValuationEvaluator {
                                         BigDecimal.ZERO
                                 ) > 0
                 )
-
                 .toList();
     }
 
@@ -135,7 +137,7 @@ public class PercentileValuationEvaluator {
 
         if (target == null
                 || target.compareTo(BigDecimal.ZERO) <= 0
-                || peerValues.isEmpty()) {
+                || peerValues.size() < MIN_VALID_PEER_COUNT) {
 
             return null;
         }
@@ -143,34 +145,24 @@ public class PercentileValuationEvaluator {
 
         long lowerCount =
                 peerValues.stream()
-
                         .filter(
                                 value ->
                                         value.compareTo(target) < 0
                         )
-
                         .count();
 
 
         long equalCount =
                 peerValues.stream()
-
                         .filter(
                                 value ->
                                         value.compareTo(target) == 0
                         )
-
                         .count();
 
 
-        /*
-         * Mid-rank percentile
-         *
-         * lower + equal / 2
-         */
         BigDecimal rank =
                 BigDecimal.valueOf(lowerCount)
-
                         .add(
                                 BigDecimal.valueOf(equalCount)
                                         .divide(
@@ -182,7 +174,6 @@ public class PercentileValuationEvaluator {
 
 
         return rank
-
                 .divide(
                         BigDecimal.valueOf(
                                 peerValues.size()
@@ -190,11 +181,9 @@ public class PercentileValuationEvaluator {
                         6,
                         RoundingMode.HALF_UP
                 )
-
                 .multiply(
                         new BigDecimal("100")
                 )
-
                 .setScale(
                         SCALE,
                         RoundingMode.HALF_UP

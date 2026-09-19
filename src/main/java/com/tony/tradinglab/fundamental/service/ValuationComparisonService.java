@@ -1,9 +1,17 @@
 package com.tony.tradinglab.fundamental.service;
 
-import com.tony.tradinglab.fundamental.domain.*;
+import com.tony.tradinglab.fundamental.domain.PeerUniverse;
+import com.tony.tradinglab.fundamental.domain.PercentileValuationAssessment;
+import com.tony.tradinglab.fundamental.domain.RegressionAdjustedValuationAssessment;
+import com.tony.tradinglab.fundamental.domain.RegressionValuationMetric;
+import com.tony.tradinglab.fundamental.domain.RobustZScoreValuationAssessment;
+import com.tony.tradinglab.fundamental.domain.ValuationComparisonResult;
+import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshot;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class ValuationComparisonService {
 
     private final PercentileValuationEvaluator percentileEvaluator;
@@ -13,27 +21,6 @@ public class ValuationComparisonService {
     private final RegressionValuationDatasetBuilder regressionDatasetBuilder;
 
     private final RegressionAdjustedValuationEvaluator regressionEvaluator;
-
-
-    public ValuationComparisonService(
-            PercentileValuationEvaluator percentileEvaluator,
-            RobustZScoreValuationEvaluator robustZScoreEvaluator,
-            RegressionValuationDatasetBuilder regressionDatasetBuilder,
-            RegressionAdjustedValuationEvaluator regressionEvaluator
-    ) {
-
-        this.percentileEvaluator =
-                percentileEvaluator;
-
-        this.robustZScoreEvaluator =
-                robustZScoreEvaluator;
-
-        this.regressionDatasetBuilder =
-                regressionDatasetBuilder;
-
-        this.regressionEvaluator =
-                regressionEvaluator;
-    }
 
 
     public ValuationComparisonResult compare(
@@ -46,41 +33,27 @@ public class ValuationComparisonService {
         );
 
 
-        /*
-         * 1. Percentile
-         */
         PercentileValuationAssessment percentile =
                 percentileEvaluator.evaluate(
                         universe
                 );
 
 
-        /*
-         * 2. Robust Z-score
-         */
         RobustZScoreValuationAssessment robustZScore =
                 robustZScoreEvaluator.evaluate(
                         universe
                 );
 
 
-        /*
-         * 3. Regression-adjusted
-         *
-         * Feature 부족 / 회귀 불가능하면 null.
-         */
         RegressionAdjustedValuationAssessment regressionAdjusted =
                 regressionDatasetBuilder
-
                         .build(
                                 universe,
                                 regressionMetric
                         )
-
                         .flatMap(
                                 regressionEvaluator::evaluate
                         )
-
                         .orElse(null);
 
 
@@ -89,23 +62,13 @@ public class ValuationComparisonService {
 
 
         return new ValuationComparisonResult(
-
                 target.stockId(),
-
                 target.symbol(),
-
-                target.valuation()
-                        .priceDate(),
-
+                target.valuation().priceDate(),
                 universe.selectionLevel(),
-
-                universe.peers()
-                        .size(),
-
+                universe.peers().size(),
                 percentile,
-
                 robustZScore,
-
                 regressionAdjusted
         );
     }
