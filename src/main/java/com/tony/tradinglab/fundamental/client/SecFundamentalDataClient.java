@@ -78,7 +78,8 @@ public class SecFundamentalDataClient
 
     private static final List<String> CAPEX_TAGS =
             List.of(
-                    "PaymentsToAcquirePropertyPlantAndEquipment"
+                    "PaymentsToAcquirePropertyPlantAndEquipment",
+                    "PaymentsToAcquireProductiveAssets"
             );
 
 
@@ -135,10 +136,6 @@ public class SecFundamentalDataClient
                         "USD"
                 );
 
-        System.out.println();
-        System.out.println(
-                "===== NVDA RAW REVENUE FACTS ====="
-        );
 
         for (SecFactPoint fact : revenueFacts) {
 
@@ -160,21 +157,12 @@ public class SecFundamentalDataClient
             );
         }
 
-        System.out.println(
-                "RAW COUNT = "
-                        + revenueFacts.size()
-        );
-
 
         List<QuarterlyFact> revenues =
                 quarterNormalizer.normalize(
                         revenueFacts
                 );
 
-        System.out.println(
-                "NORMALIZED COUNT = "
-                        + revenues.size()
-        );
 
 //        List<QuarterlyFact> revenues =
 //                quarterNormalizer.normalize(
@@ -246,24 +234,122 @@ public class SecFundamentalDataClient
                 );
 
 
+        List<SecFactPoint> ocfFacts =
+                factExtractor.extract(
+                        response,
+                        OCF_TAGS,
+                        "USD"
+                );
+
+
         List<QuarterlyFact> operatingCashFlows =
                 cashFlowNormalizer.normalize(
-                        factExtractor.extract(
-                                response,
-                                OCF_TAGS,
-                                "USD"
-                        )
+                        ocfFacts
+                );
+
+
+        List<SecFactPoint> capexFacts =
+                factExtractor.extract(
+                        response,
+                        CAPEX_TAGS,
+                        "USD"
                 );
 
 
         List<QuarterlyFact> capitalExpenditures =
                 cashFlowNormalizer.normalize(
-                        factExtractor.extract(
-                                response,
-                                CAPEX_TAGS,
-                                "USD"
-                        )
+                        capexFacts
                 );
+
+
+        capexFacts.stream()
+
+                .skip(
+                        Math.max(
+                                0,
+                                capexFacts.size() - 20
+                        )
+                )
+
+                .forEach(
+                        fact ->
+                                System.out.println(
+                                        "tag="
+                                                + fact.tag()
+                                                + " | start="
+                                                + fact.startDate()
+                                                + " | end="
+                                                + fact.endDate()
+                                                + " | filed="
+                                                + fact.filedDate()
+                                                + " | FY="
+                                                + fact.fiscalYear()
+                                                + " | FP="
+                                                + fact.fiscalPeriod()
+                                                + " | form="
+                                                + fact.form()
+                                                + " | value="
+                                                + fact.value()
+                                )
+                );
+
+        capitalExpenditures.forEach(
+                fact ->
+                        System.out.println(
+                                fact.fiscalYear()
+                                        + " "
+                                        + fact.fiscalQuarter()
+                                        + " | start="
+                                        + fact.startDate()
+                                        + " | end="
+                                        + fact.endDate()
+                                        + " | filed="
+                                        + fact.filedDate()
+                                        + " | value="
+                                        + fact.value()
+                        )
+        );
+
+        operatingCashFlows.stream()
+
+                .skip(
+                        Math.max(
+                                0,
+                                operatingCashFlows.size() - 8
+                        )
+                )
+
+                .forEach(
+                        fact ->
+                                System.out.println(
+                                        fact.fiscalYear()
+                                                + " "
+                                                + fact.fiscalQuarter()
+                                                + " | end="
+                                                + fact.endDate()
+                                                + " | value="
+                                                + fact.value()
+                                )
+                );
+
+//        List<QuarterlyFact> operatingCashFlows =
+//                cashFlowNormalizer.normalize(
+//                        factExtractor.extract(
+//                                response,
+//                                OCF_TAGS,
+//                                "USD"
+//                        )
+//                );
+//
+//
+//        List<QuarterlyFact> capitalExpenditures =
+//                cashFlowNormalizer.normalize(
+//                        factExtractor.extract(
+//                                response,
+//                                CAPEX_TAGS,
+//                                "USD"
+//                        )
+//                );
 
 
         List<QuarterlyFact> sharesOutstanding =

@@ -6,24 +6,17 @@ import com.tony.tradinglab.fundamental.domain.ValuationMetrics;
 import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshot;
 import com.tony.tradinglab.stock.classification.domain.StockClassification;
 import com.tony.tradinglab.stock.classification.service.StockClassificationService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.Optional;
 
 @Component
+@RequiredArgsConstructor
 public class ValuationPeerSnapshotFactory {
 
     private final StockClassificationService classificationService;
-
-
-    public ValuationPeerSnapshotFactory(
-            StockClassificationService classificationService
-    ) {
-
-        this.classificationService =
-                classificationService;
-    }
 
 
     public Optional<ValuationPeerSnapshot> create(
@@ -64,13 +57,10 @@ public class ValuationPeerSnapshotFactory {
 
         return Optional.of(
                 new ValuationPeerSnapshot(
-
                         stockId,
                         symbol,
-
                         resolved.sector(),
                         resolved.industry(),
-
                         valuation,
                         growth,
                         profitability
