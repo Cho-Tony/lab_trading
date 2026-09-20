@@ -51,21 +51,6 @@ class GrowthAccelerationCalculatorTest {
         assertThat(
                 result.get(1).accelerationPctPoint()
         ).isEqualByComparingTo("13.00");
-
-        result.forEach(growth ->
-                System.out.println(
-                        "FY" + growth.fiscalYear()
-                                + " " + growth.fiscalQuarter()
-                                + " | YoY="
-                                + growth.yoyGrowthPct() + "%"
-                                + " | Previous YoY="
-                                + growth.previousQuarterYoyGrowthPct() + "%"
-                                + " | Acceleration="
-                                + growth.accelerationPctPoint() + "%p"
-                                + " | filed="
-                                + growth.filedDate()
-                )
-        );
     }
 
     private RevenueGrowth createGrowth(

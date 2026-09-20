@@ -1,4 +1,4 @@
-package com.tony.tradinglab.fundamental.universe;
+package com.tony.tradinglab.universe;
 
 import java.util.List;
 
@@ -8,7 +8,7 @@ public final class ValuationUniverse {
     }
 
 
-    public static List<Target> targets() {
+    public static List<UniverseTarget> targets() {
 
         return List.of(
 

@@ -3,13 +3,16 @@ package com.tony.tradinglab.marketdata.service;
 import com.tony.tradinglab.price.service.MarketDataSyncService;
 import com.tony.tradinglab.stock.domain.Stock;
 import com.tony.tradinglab.stock.repository.StockRepository;
+import com.tony.tradinglab.universe.UniverseTarget;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MarketPriceUniverseSyncService {
@@ -20,7 +23,7 @@ public class MarketPriceUniverseSyncService {
 
 
     public List<SyncResult> sync(
-            List<Target> targets,
+            List<UniverseTarget> targets,
             LocalDate startDate,
             LocalDate endDate
     ) {
@@ -43,21 +46,55 @@ public class MarketPriceUniverseSyncService {
 
 
         List<SyncResult> results =
-                new ArrayList<>();
+                new ArrayList<>(
+                        targets.size()
+                );
 
 
-        for (Target target : targets) {
+        for (UniverseTarget target : targets) {
 
-            String symbol =
-                    target.symbol()
-                            .trim()
-                            .toUpperCase();
+            if (target == null) {
 
-            String exchange =
-                    target.exchange()
-                            .trim()
-                            .toUpperCase();
+                throw new IllegalArgumentException(
+                        "target은 null일 수 없습니다."
+                );
+            }
 
+
+            results.add(
+                    syncTarget(
+                            target,
+                            startDate,
+                            endDate
+                    )
+            );
+        }
+
+
+        return List.copyOf(
+                results
+        );
+    }
+
+
+    private SyncResult syncTarget(
+            UniverseTarget target,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+
+        String symbol =
+                target.symbol()
+                        .trim()
+                        .toUpperCase();
+
+        String exchange =
+                target.exchange()
+                        .trim()
+                        .toUpperCase();
+
+
+        try {
 
             Stock stock =
                     stockRepository
@@ -76,12 +113,7 @@ public class MarketPriceUniverseSyncService {
                             );
 
 
-            /*
-             * Universe 최초 구축 / 과거 누락 보충이므로
-             * 일반 incremental sync()가 아니라
-             * syncRange()를 사용한다.
-             */
-            int inserted =
+            int insertedPrices =
                     marketDataSyncService.syncRange(
                             symbol,
                             exchange,
@@ -90,33 +122,57 @@ public class MarketPriceUniverseSyncService {
                     );
 
 
-            results.add(
-                    new SyncResult(
-                            stock.getId(),
-                            symbol,
-                            exchange,
-                            inserted
-                    )
+            return new SyncResult(
+                    stock.getId(),
+                    symbol,
+                    exchange,
+                    insertedPrices,
+                    SyncStatus.SUCCESS,
+                    null
+            );
+
+        } catch (RuntimeException e) {
+
+            log.error(
+                    "Market price sync failed. symbol={}, exchange={}",
+                    symbol,
+                    exchange,
+                    e
+            );
+
+
+            return new SyncResult(
+                    null,
+                    symbol,
+                    exchange,
+                    0,
+                    SyncStatus.FAILED,
+                    e.getMessage()
             );
         }
-
-
-        return results;
     }
 
 
-    public record Target(
-            String symbol,
-            String exchange
-    ) {
+    public enum SyncStatus {
+
+        SUCCESS,
+        FAILED
     }
 
 
     public record SyncResult(
+
             Long stockId,
+
             String symbol,
             String exchange,
-            int insertedPrices
+
+            int insertedPrices,
+
+            SyncStatus status,
+
+            String errorMessage
+
     ) {
     }
 }

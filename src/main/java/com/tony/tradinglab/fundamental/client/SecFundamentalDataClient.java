@@ -137,27 +137,6 @@ public class SecFundamentalDataClient
                 );
 
 
-        for (SecFactPoint fact : revenueFacts) {
-
-            System.out.println(
-                    "tag="
-                            + fact.tag()
-                            + " | start="
-                            + fact.startDate()
-                            + " | end="
-                            + fact.endDate()
-                            + " | filed="
-                            + fact.filedDate()
-                            + " | FY="
-                            + fact.fiscalYear()
-                            + " | FP="
-                            + fact.fiscalPeriod()
-                            + " | form="
-                            + fact.form()
-            );
-        }
-
-
         List<QuarterlyFact> revenues =
                 quarterNormalizer.normalize(
                         revenueFacts
@@ -259,77 +238,6 @@ public class SecFundamentalDataClient
         List<QuarterlyFact> capitalExpenditures =
                 cashFlowNormalizer.normalize(
                         capexFacts
-                );
-
-
-        capexFacts.stream()
-
-                .skip(
-                        Math.max(
-                                0,
-                                capexFacts.size() - 20
-                        )
-                )
-
-                .forEach(
-                        fact ->
-                                System.out.println(
-                                        "tag="
-                                                + fact.tag()
-                                                + " | start="
-                                                + fact.startDate()
-                                                + " | end="
-                                                + fact.endDate()
-                                                + " | filed="
-                                                + fact.filedDate()
-                                                + " | FY="
-                                                + fact.fiscalYear()
-                                                + " | FP="
-                                                + fact.fiscalPeriod()
-                                                + " | form="
-                                                + fact.form()
-                                                + " | value="
-                                                + fact.value()
-                                )
-                );
-
-        capitalExpenditures.forEach(
-                fact ->
-                        System.out.println(
-                                fact.fiscalYear()
-                                        + " "
-                                        + fact.fiscalQuarter()
-                                        + " | start="
-                                        + fact.startDate()
-                                        + " | end="
-                                        + fact.endDate()
-                                        + " | filed="
-                                        + fact.filedDate()
-                                        + " | value="
-                                        + fact.value()
-                        )
-        );
-
-        operatingCashFlows.stream()
-
-                .skip(
-                        Math.max(
-                                0,
-                                operatingCashFlows.size() - 8
-                        )
-                )
-
-                .forEach(
-                        fact ->
-                                System.out.println(
-                                        fact.fiscalYear()
-                                                + " "
-                                                + fact.fiscalQuarter()
-                                                + " | end="
-                                                + fact.endDate()
-                                                + " | value="
-                                                + fact.value()
-                                )
                 );
 
 //        List<QuarterlyFact> operatingCashFlows =

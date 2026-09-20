@@ -1,4 +1,4 @@
-package com.tony.tradinglab.fundamental.universe;
+package com.tony.tradinglab.universe;
 
 public record UniverseTarget(
 

@@ -108,4 +108,25 @@ public class StockClassificationEntity {
         this.effectiveTo = effectiveTo;
         this.source = source;
     }
+
+    public void closeAt(
+            LocalDate effectiveTo
+    ) {
+
+        if (effectiveTo == null) {
+            throw new IllegalArgumentException(
+                    "effectiveTo는 null일 수 없습니다."
+            );
+        }
+
+        if (effectiveFrom != null
+                && !effectiveTo.isAfter(effectiveFrom)) {
+
+            throw new IllegalArgumentException(
+                    "effectiveTo는 effectiveFrom보다 이후여야 합니다."
+            );
+        }
+
+        this.effectiveTo = effectiveTo;
+    }
 }

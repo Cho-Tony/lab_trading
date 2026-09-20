@@ -54,28 +54,5 @@ class RevenueGrowthCalculatorTest {
                 revenueGrowthCalculator.calculate(quarters);
 
         assertThat(growths).isNotEmpty();
-
-        growths.stream()
-                .skip(Math.max(
-                        0,
-                        growths.size() - 8
-                ))
-                .forEach(growth ->
-                        System.out.println(
-                                "FY"
-                                        + growth.fiscalYear()
-                                        + " "
-                                        + growth.fiscalQuarter()
-                                        + " | revenue="
-                                        + growth.revenue()
-                                        + " | previous="
-                                        + growth.previousYearRevenue()
-                                        + " | YoY="
-                                        + growth.yoyGrowthPct()
-                                        + "%"
-                                        + " | filed="
-                                        + growth.filedDate()
-                        )
-                );
     }
 }

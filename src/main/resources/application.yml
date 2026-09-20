@@ -8,7 +8,9 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-
+    properties:
+      hibernate:
+        format_sql: true
   flyway:
     enabled: true
 
@@ -16,8 +18,20 @@ market-data:
   twelve-data:
     api-key: ${TWELVE_DATA_API_KEY}
     base-url: https://api.twelvedata.com
+    min-request-interval-ms: 8000
 
 sec:
   base-url: https://www.sec.gov
   data-base-url: https://data.sec.gov
   user-agent: ${SEC_USER_AGENT}
+
+valuation-universe:
+  classification-effective-from: 2026-07-31
+  classification-source: MANUAL
+  price-start-date: 2026-01-01
+  price-end-date: 2026-07-31
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE

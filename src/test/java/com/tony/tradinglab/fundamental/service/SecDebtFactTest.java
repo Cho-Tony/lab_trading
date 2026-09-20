@@ -86,7 +86,6 @@ class SecDebtFactTest {
                 "========== Short-Term Debt =========="
         );
 
-        printRecent(shortTermDebt);
 
 
         System.out.println();
@@ -94,45 +93,12 @@ class SecDebtFactTest {
                 "========== Current Long-Term Debt =========="
         );
 
-        printRecent(currentLongTermDebt);
-
 
         System.out.println();
         System.out.println(
                 "========== Long-Term Debt =========="
         );
 
-        printRecent(longTermDebt);
     }
 
-    private void printRecent(
-            List<QuarterlyFact> facts
-    ) {
-
-        facts.stream()
-                .skip(
-                        Math.max(
-                                0,
-                                facts.size() - 12
-                        )
-                )
-                .forEach(fact ->
-                        System.out.println(
-
-                                "FY"
-                                        + fact.fiscalYear()
-                                        + " "
-                                        + fact.fiscalQuarter()
-
-                                        + " | value="
-                                        + fact.value()
-
-                                        + " | end="
-                                        + fact.endDate()
-
-                                        + " | filed="
-                                        + fact.filedDate()
-                        )
-                );
-    }
 }
