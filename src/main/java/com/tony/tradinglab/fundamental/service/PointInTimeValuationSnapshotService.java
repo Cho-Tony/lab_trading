@@ -76,6 +76,12 @@ public class PointInTimeValuationSnapshotService {
 
         if (stockOptional.isEmpty()) {
 
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> stock not found"
+            );
+
             return Optional.empty();
         }
 
@@ -86,10 +92,6 @@ public class PointInTimeValuationSnapshotService {
 
         /*
          * 2. Fundamental
-         *
-         * DB 우선.
-         * DB가 완전히 비어 있으면 Provider가
-         * SEC sync 후 DB에서 다시 읽는다.
          */
         List<FinancialStatementData> statements =
                 fundamentalDataProvider
@@ -102,12 +104,19 @@ public class PointInTimeValuationSnapshotService {
 
         if (statements.isEmpty()) {
 
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> no fundamental statements as of "
+                            + observationDate
+            );
+
             return Optional.empty();
         }
 
 
         /*
-         * 3. 기존 Fundamental Analyzer용 입력
+         * 3. Fundamental Analyzer
          */
         List<QuarterlyFinancials> quarterlyFinancials =
                 statements.stream()
@@ -181,6 +190,12 @@ public class PointInTimeValuationSnapshotService {
 
         if (fundamentalOptional.isEmpty()) {
 
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> fundamental analysis unavailable"
+            );
+
             return Optional.empty();
         }
 
@@ -194,7 +209,7 @@ public class PointInTimeValuationSnapshotService {
 
 
         /*
-         * 4. Cash Flow → TTM FCF
+         * 4. Cash Flow -> TTM FCF
          */
         List<QuarterlyCashFlow> quarterlyCashFlows =
                 statements.stream()
@@ -267,12 +282,26 @@ public class PointInTimeValuationSnapshotService {
 
         if (ttmCashFlowOptional.isEmpty()) {
 
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> TTM cash flow unavailable"
+                            + " | target="
+                            + ttmFinancials.fiscalYear()
+                            + " "
+                            + ttmFinancials.fiscalQuarter()
+                            + " | quarterlyCashFlows="
+                            + quarterlyCashFlows.size()
+            );
+
             return Optional.empty();
         }
 
 
         /*
          * 5. PIT Shares Outstanding
+         *
+         * null뿐 아니라 0 이하도 valuation 입력으로 사용할 수 없다.
          */
         Optional<BigDecimal> sharesOptional =
                 statements.stream()
@@ -282,10 +311,20 @@ public class PointInTimeValuationSnapshotService {
                                         data.sharesOutstanding() != null
                         )
 
+                        .filter(
+                                data ->
+                                        data.sharesOutstanding()
+                                                .signum() > 0
+                        )
+
                         .max(
-                                Comparator.comparing(
-                                        FinancialStatementData::filedDate
-                                )
+                                Comparator
+                                        .comparing(
+                                                FinancialStatementData::filedDate
+                                        )
+                                        .thenComparing(
+                                                FinancialStatementData::periodEndDate
+                                        )
                         )
 
                         .map(
@@ -295,15 +334,18 @@ public class PointInTimeValuationSnapshotService {
 
         if (sharesOptional.isEmpty()) {
 
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> valid shares outstanding unavailable"
+            );
+
             return Optional.empty();
         }
 
 
         /*
          * 6. Market Price
-         *
-         * DB에 usable price가 있으면 API 호출 X.
-         * 없으면 MarketPriceProvider가 backfill한다.
          */
         Optional<StockPrice> priceOptional =
                 marketPriceProvider
@@ -315,6 +357,12 @@ public class PointInTimeValuationSnapshotService {
 
 
         if (priceOptional.isEmpty()) {
+
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> market price unavailable"
+            );
 
             return Optional.empty();
         }
@@ -345,21 +393,33 @@ public class PointInTimeValuationSnapshotService {
 
         /*
          * 8. Peer Snapshot Input
-         *
-         * 아직 sector / industry는 여기서 붙이지 않는다.
-         * 다음 Assembler 단계에서 PIT classification을 결합한다.
          */
-        return snapshotInputFactory
-                .create(
+        Optional<ValuationPeerSnapshotInput> snapshotOptional =
+                snapshotInputFactory
+                        .create(
 
-                        stock.getId(),
-                        normalizedSymbol,
-                        observationDate,
+                                stock.getId(),
+                                normalizedSymbol,
+                                observationDate,
 
-                        valuation,
+                                valuation,
 
-                        fundamental.growth(),
-                        fundamental.profitability()
-                );
+                                fundamental.growth(),
+                                fundamental.profitability()
+                        );
+
+
+        if (snapshotOptional.isEmpty()) {
+
+            System.out.println(
+                    "[SNAPSHOT] "
+                            + normalizedSymbol
+                            + " -> snapshot factory rejected input"
+            );
+        }
+
+
+        return snapshotOptional;
     }
+
 }

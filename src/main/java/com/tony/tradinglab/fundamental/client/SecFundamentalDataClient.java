@@ -142,6 +142,16 @@ public class SecFundamentalDataClient
                         revenueFacts
                 );
 
+        if ("CRWD".equalsIgnoreCase(symbol)) {
+
+            System.out.println(
+                    "[SEC DEBUG] CRWD"
+                            + " | revenueFacts="
+                            + revenueFacts.size()
+                            + " | normalizedRevenues="
+                            + revenues.size()
+            );
+        }
 
 //        List<QuarterlyFact> revenues =
 //                quarterNormalizer.normalize(
@@ -458,59 +468,76 @@ public class SecFundamentalDataClient
                 .toList();
     }
 
-
     private List<QuarterlyFact> loadSharesOutstanding(
             SecCompanyFactsResponse response
     ) {
 
         /*
-         * 가장 일반적인 SEC shares outstanding는
-         * dei taxonomy에 존재한다.
+         * 1. DEI
          */
-        List<SecFactPoint> deiFacts =
-                factExtractor.extract(
+        List<QuarterlyFact> deiShares =
+                instantFactNormalizer
+                        .normalize(
+                                factExtractor.extract(
 
-                        response,
+                                        response,
 
-                        "dei",
+                                        "dei",
 
-                        List.of(
-                                "EntityCommonStockSharesOutstanding"
-                        ),
+                                        List.of(
+                                                "EntityCommonStockSharesOutstanding"
+                                        ),
 
-                        "shares"
-                );
+                                        "shares"
+                                )
+                        )
+                        .stream()
+
+                        .filter(
+                                fact ->
+                                        fact.value() != null
+                                                && fact.value().signum() > 0
+                        )
+
+                        .toList();
 
 
-        if (!deiFacts.isEmpty()) {
+        if (!deiShares.isEmpty()) {
 
-            return instantFactNormalizer.normalize(
-                    deiFacts
-            );
+            return deiShares;
         }
 
 
         /*
-         * 일부 issuer fallback.
+         * 2. us-gaap fallback
+         *
+         * DEI raw fact가 존재하더라도
+         * normalize 결과가 usable하지 않으면 fallback한다.
          */
-        List<SecFactPoint> usGaapFacts =
-                factExtractor.extract(
+        return instantFactNormalizer
+                .normalize(
+                        factExtractor.extract(
 
-                        response,
+                                response,
 
-                        "us-gaap",
+                                "us-gaap",
 
-                        List.of(
-                                "CommonStockSharesOutstanding"
-                        ),
+                                List.of(
+                                        "CommonStockSharesOutstanding"
+                                ),
 
-                        "shares"
-                );
+                                "shares"
+                        )
+                )
+                .stream()
 
+                .filter(
+                        fact ->
+                                fact.value() != null
+                                        && fact.value().signum() > 0
+                )
 
-        return instantFactNormalizer.normalize(
-                usGaapFacts
-        );
+                .toList();
     }
 
 

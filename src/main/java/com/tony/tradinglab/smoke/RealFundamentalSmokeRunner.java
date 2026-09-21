@@ -7,14 +7,19 @@ import com.tony.tradinglab.fundamental.domain.ValuationComparisonResult;
 import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshotInput;
 import com.tony.tradinglab.fundamental.service.PointInTimeValuationComparisonService;
 import com.tony.tradinglab.fundamental.service.PointInTimeValuationSnapshotService;
+import com.tony.tradinglab.universe.UniverseTarget;
+import com.tony.tradinglab.universe.ValuationUniverse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 @Profile("smoke")
@@ -42,36 +47,70 @@ public class RealFundamentalSmokeRunner
                 );
 
 
-        List<String> symbols =
-                List.of(
-                        "AAPL",
-                        "MSFT",
-                        "NVDA",
-                        "AVGO"
-                );
-
+        List<UniverseTarget> targets =
+                ValuationUniverse.targets();
 
         List<ValuationPeerSnapshotInput> inputs =
-                symbols.stream()
-                        .map(
-                                symbol ->
-                                        pointInTimeValuationSnapshotService
-                                                .analyze(
-                                                        symbol,
-                                                        "NASDAQ",
-                                                        observationDate
-                                                )
+                new ArrayList<>();
+
+        List<String> snapshotFailures =
+                new ArrayList<>();
+
+
+        for (UniverseTarget target : targets) {
+
+            try {
+
+                pointInTimeValuationSnapshotService
+                        .analyze(
+                                target.symbol(),
+                                target.exchange(),
+                                observationDate
                         )
-                        .flatMap(Optional::stream)
-                        .toList();
+                        .ifPresentOrElse(
+                                inputs::add,
+                                () ->
+                                        snapshotFailures.add(
+                                                target.symbol()
+                                                        + " -> snapshot unavailable"
+                                        )
+                        );
 
+            } catch (RuntimeException e) {
 
-        if (inputs.size() != symbols.size()) {
-
-            throw new IllegalStateException(
-                    "Some valuation snapshots could not be created."
-            );
+                snapshotFailures.add(
+                        target.symbol()
+                                + " -> "
+                                + e.getMessage()
+                );
+            }
         }
+
+
+
+
+        Set<String> createdSymbols =
+                inputs.stream()
+                        .map(
+                                ValuationPeerSnapshotInput::symbol
+                        )
+                        .collect(
+                                Collectors.toSet()
+                        );
+
+
+        List<String> missingSymbols =
+                targets.stream()
+                        .map(
+                                UniverseTarget::symbol
+                        )
+                        .filter(
+                                symbol ->
+                                        !createdSymbols.contains(
+                                                symbol
+                                        )
+                        )
+                        .toList();
 
 
         ValuationPeerSnapshotInput target =
@@ -129,6 +168,42 @@ public class RealFundamentalSmokeRunner
                 "======================================"
         );
 
+
+        System.out.println(
+                "Universe Target Count = "
+                        + targets.size()
+        );
+
+        System.out.println(
+                "Snapshot Created Count = "
+                        + inputs.size()
+        );
+
+
+        if (!missingSymbols.isEmpty()) {
+
+            System.out.println(
+                    "Snapshot Missing = "
+                            + missingSymbols
+            );
+        }
+
+        if (!snapshotFailures.isEmpty()) {
+
+            System.out.println(
+                    "Snapshot Failures:"
+            );
+
+            snapshotFailures.forEach(
+                    failure ->
+                            System.out.println(
+                                    " - " + failure
+                            )
+            );
+        }
+
+
+        System.out.println();
         System.out.println(
                 "Symbol = "
                         + result.symbol()
