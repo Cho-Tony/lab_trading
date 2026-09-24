@@ -25,6 +25,7 @@ public class SecFundamentalDataClient
     private static final List<String> REVENUE_TAGS =
             List.of(
                     "RevenueFromContractWithCustomerExcludingAssessedTax",
+                    "RevenueFromContractWithCustomerIncludingAssessedTax",
                     "SalesRevenueNet",
                     "Revenues"
             );
@@ -82,6 +83,12 @@ public class SecFundamentalDataClient
                     "PaymentsToAcquireProductiveAssets"
             );
 
+    private static final List<String> DILUTED_SHARES_TAGS =
+            List.of(
+                    "WeightedAverageNumberOfDilutedSharesOutstanding",
+                    "WeightedAverageNumberOfSharesOutstanding"
+            );
+
 
     private final SecCompanyFactsClient companyFactsClient;
 
@@ -128,6 +135,34 @@ public class SecFundamentalDataClient
                 companyFactsClient.getCompanyFacts(
                         symbol
                 );
+
+        if ("CRWD".equalsIgnoreCase(symbol)) {
+
+            factExtractor.printMatchingTags(
+                    response,
+                    symbol,
+                    List.of(
+                            "revenue",
+                            "sales",
+                            "subscription",
+                            "service"
+                    )
+            );
+        }
+
+
+        if ("IBM".equalsIgnoreCase(symbol)) {
+
+            factExtractor.printMatchingTags(
+                    response,
+                    symbol,
+                    List.of(
+                            "operating",
+                            "income",
+                            "profit"
+                    )
+            );
+        }
 
         List<SecFactPoint> revenueFacts =
                 factExtractor.extract(
@@ -269,12 +304,25 @@ public class SecFundamentalDataClient
 //                        )
 //                );
 
-
         List<QuarterlyFact> sharesOutstanding =
                 loadSharesOutstanding(
-                        response
+                        response,
+                        symbol
                 );
 
+        List<QuarterlyFact> dilutedShares =
+                quarterNormalizer.normalize(
+                        factExtractor.extract(
+                                response,
+                                DILUTED_SHARES_TAGS,
+                                "shares"
+                        )
+                );
+
+        Map<QuarterKey, QuarterlyFact> dilutedSharesMap =
+                toMap(
+                        dilutedShares
+                );
 
         Map<QuarterKey, QuarterlyFact> operatingIncomeMap =
                 toMap(
@@ -385,6 +433,17 @@ public class SecFundamentalDataClient
                                     );
 
 
+                            if (shares == null
+                                    || shares.value() == null
+                                    || shares.value().signum() <= 0) {
+
+                                shares =
+                                        dilutedSharesMap.get(
+                                                key
+                                        );
+                            }
+
+
                             LocalDate filedDate =
                                     latestFiledDate(
 
@@ -469,27 +528,44 @@ public class SecFundamentalDataClient
     }
 
     private List<QuarterlyFact> loadSharesOutstanding(
-            SecCompanyFactsResponse response
+            SecCompanyFactsResponse response,
+            String symbol
     ) {
 
-        /*
-         * 1. DEI
-         */
+        List<SecFactPoint> deiFacts =
+                factExtractor.extract(
+
+                        response,
+
+                        "dei",
+
+                        List.of(
+                                "EntityCommonStockSharesOutstanding"
+                        ),
+
+                        "shares"
+                );
+
+
+        List<SecFactPoint> usGaapFacts =
+                factExtractor.extract(
+
+                        response,
+
+                        "us-gaap",
+
+                        List.of(
+                                "CommonStockSharesOutstanding"
+                        ),
+
+                        "shares"
+                );
+
+
         List<QuarterlyFact> deiShares =
                 instantFactNormalizer
                         .normalize(
-                                factExtractor.extract(
-
-                                        response,
-
-                                        "dei",
-
-                                        List.of(
-                                                "EntityCommonStockSharesOutstanding"
-                                        ),
-
-                                        "shares"
-                                )
+                                deiFacts
                         )
                         .stream()
 
@@ -508,26 +584,9 @@ public class SecFundamentalDataClient
         }
 
 
-        /*
-         * 2. us-gaap fallback
-         *
-         * DEI raw fact가 존재하더라도
-         * normalize 결과가 usable하지 않으면 fallback한다.
-         */
         return instantFactNormalizer
                 .normalize(
-                        factExtractor.extract(
-
-                                response,
-
-                                "us-gaap",
-
-                                List.of(
-                                        "CommonStockSharesOutstanding"
-                                ),
-
-                                "shares"
-                        )
+                        usGaapFacts
                 )
                 .stream()
 

@@ -286,7 +286,6 @@ public class MarketDataSyncService {
                                 normalizedSymbol,
                                 normalizedExchange
                         )
-
                         .orElseThrow(
                                 () ->
                                         new IllegalStateException(
@@ -299,7 +298,9 @@ public class MarketDataSyncService {
 
 
         /*
-         * 현재 요청 기간에 이미 저장되어 있는 날짜 확인.
+         * 요청 범위 안에 이미 저장된 가격.
+         *
+         * 중간 누락은 없다고 가정한다.
          */
         List<StockPrice> existingPrices =
                 stockPriceRepository
@@ -310,99 +311,259 @@ public class MarketDataSyncService {
                         );
 
 
-        Set<LocalDate> existingDates =
-                existingPrices.stream()
+        /*
+         * DB에 요청 범위 데이터가 전혀 없으면
+         * 요청 구간 전체를 가져온다.
+         */
+        if (existingPrices.isEmpty()) {
 
-                        .map(
-                                StockPrice::getTradeDate
+            List<DailyPrice> dailyPrices =
+                    marketDataClient
+                            .getDailyPrices(
+                                    normalizedSymbol,
+                                    startDate,
+                                    endDate.plusDays(1)
+                            );
+
+
+            if (dailyPrices == null
+                    || dailyPrices.isEmpty()) {
+
+                return 0;
+            }
+
+
+            List<StockPrice> newPrices =
+                    dailyPrices.stream()
+
+                            .filter(
+                                    price ->
+                                            price != null
+                                                    && price.tradeDate() != null
+                            )
+
+                            .filter(
+                                    price ->
+                                            !price.tradeDate()
+                                                    .isBefore(startDate)
+                            )
+
+                            .filter(
+                                    price ->
+                                            !price.tradeDate()
+                                                    .isAfter(endDate)
+                            )
+
+                            .map(
+                                    price ->
+                                            new StockPrice(
+
+                                                    stock,
+
+                                                    price.tradeDate(),
+
+                                                    price.open(),
+                                                    price.high(),
+                                                    price.low(),
+                                                    price.close(),
+                                                    price.adjustedClose(),
+                                                    price.volume()
+                                            )
+                            )
+
+                            .toList();
+
+
+            if (newPrices.isEmpty()) {
+
+                return 0;
+            }
+
+
+            stockPriceRepository.saveAll(
+                    newPrices
+            );
+
+
+            return newPrices.size();
+        }
+
+
+        LocalDate firstStoredDate =
+                existingPrices
+                        .get(0)
+                        .getTradeDate();
+
+
+        LocalDate lastStoredDate =
+                existingPrices
+                        .get(
+                                existingPrices.size() - 1
                         )
+                        .getTradeDate();
 
-                        .collect(
-                                java.util.stream.Collectors.toSet()
-                        );
+
+        int insertedCount = 0;
 
 
         /*
-         * 과거 backfill 용도이므로
-         * 요청한 기간 자체를 Twelve Data에 요청한다.
+         * DB보다 이전 데이터가 필요한 경우.
          *
-         * endDate까지 포함시키기 위해 +1 day.
+         * startDate가 휴장일일 수 있으므로,
+         * 첫 저장일과 7일 이내 차이라면
+         * 이미 시작 범위를 커버한다고 본다.
          */
-        List<DailyPrice> dailyPrices =
-                marketDataClient
-                        .getDailyPrices(
-                                normalizedSymbol,
-                                startDate,
-                                endDate.plusDays(1)
-                        );
+        if (firstStoredDate.isAfter(
+                startDate.plusDays(7)
+        )) {
+
+            LocalDate missingEndDate =
+                    firstStoredDate.minusDays(1);
 
 
-        if (dailyPrices == null
-                || dailyPrices.isEmpty()) {
+            List<DailyPrice> earlierPrices =
+                    marketDataClient
+                            .getDailyPrices(
+                                    normalizedSymbol,
+                                    startDate,
+                                    missingEndDate.plusDays(1)
+                            );
 
-            return 0;
+
+            if (earlierPrices != null
+                    && !earlierPrices.isEmpty()) {
+
+                List<StockPrice> newEarlierPrices =
+                        earlierPrices.stream()
+
+                                .filter(
+                                        price ->
+                                                price != null
+                                                        && price.tradeDate() != null
+                                )
+
+                                .filter(
+                                        price ->
+                                                !price.tradeDate()
+                                                        .isBefore(startDate)
+                                )
+
+                                .filter(
+                                        price ->
+                                                !price.tradeDate()
+                                                        .isAfter(missingEndDate)
+                                )
+
+                                .map(
+                                        price ->
+                                                new StockPrice(
+
+                                                        stock,
+
+                                                        price.tradeDate(),
+
+                                                        price.open(),
+                                                        price.high(),
+                                                        price.low(),
+                                                        price.close(),
+                                                        price.adjustedClose(),
+                                                        price.volume()
+                                                )
+                                )
+
+                                .toList();
+
+
+                if (!newEarlierPrices.isEmpty()) {
+
+                    stockPriceRepository.saveAll(
+                            newEarlierPrices
+                    );
+
+
+                    insertedCount +=
+                            newEarlierPrices.size();
+                }
+            }
         }
 
 
-        List<StockPrice> newPrices =
-                dailyPrices.stream()
+        /*
+         * DB보다 이후 데이터가 필요한 경우.
+         */
+        if (endDate.isAfter(lastStoredDate)) {
 
-                        .filter(
-                                price ->
-                                        price != null
-                                                && price.tradeDate() != null
-                        )
-
-                        .filter(
-                                price ->
-                                        !price.tradeDate()
-                                                .isBefore(startDate)
-                        )
-
-                        .filter(
-                                price ->
-                                        !price.tradeDate()
-                                                .isAfter(endDate)
-                        )
-
-                        .filter(
-                                price ->
-                                        !existingDates.contains(
-                                                price.tradeDate()
-                                        )
-                        )
-
-                        .map(
-                                price ->
-                                        new StockPrice(
-
-                                                stock,
-
-                                                price.tradeDate(),
-
-                                                price.open(),
-                                                price.high(),
-                                                price.low(),
-                                                price.close(),
-                                                price.adjustedClose(),
-                                                price.volume()
-                                        )
-                        )
-
-                        .toList();
+            LocalDate missingStartDate =
+                    lastStoredDate.plusDays(1);
 
 
-        if (newPrices.isEmpty()) {
+            List<DailyPrice> laterPrices =
+                    marketDataClient
+                            .getDailyPrices(
+                                    normalizedSymbol,
+                                    missingStartDate,
+                                    endDate.plusDays(1)
+                            );
 
-            return 0;
+
+            if (laterPrices != null
+                    && !laterPrices.isEmpty()) {
+
+                List<StockPrice> newLaterPrices =
+                        laterPrices.stream()
+
+                                .filter(
+                                        price ->
+                                                price != null
+                                                        && price.tradeDate() != null
+                                )
+
+                                .filter(
+                                        price ->
+                                                !price.tradeDate()
+                                                        .isBefore(missingStartDate)
+                                )
+
+                                .filter(
+                                        price ->
+                                                !price.tradeDate()
+                                                        .isAfter(endDate)
+                                )
+
+                                .map(
+                                        price ->
+                                                new StockPrice(
+
+                                                        stock,
+
+                                                        price.tradeDate(),
+
+                                                        price.open(),
+                                                        price.high(),
+                                                        price.low(),
+                                                        price.close(),
+                                                        price.adjustedClose(),
+                                                        price.volume()
+                                                )
+                                )
+
+                                .toList();
+
+
+                if (!newLaterPrices.isEmpty()) {
+
+                    stockPriceRepository.saveAll(
+                            newLaterPrices
+                    );
+
+
+                    insertedCount +=
+                            newLaterPrices.size();
+                }
+            }
         }
 
 
-        stockPriceRepository.saveAll(
-                newPrices
-        );
-
-
-        return newPrices.size();
+        return insertedCount;
     }
 }

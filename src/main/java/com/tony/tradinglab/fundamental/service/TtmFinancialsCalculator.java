@@ -119,19 +119,34 @@ public class TtmFinancialsCalculator {
                 );
     }
 
-
     private BigDecimal sumOperatingIncome(
             List<QuarterlyFinancials> window
     ) {
 
-        return window.stream()
-                .map(
-                        QuarterlyFinancials::operatingIncome
-                )
-                .reduce(
-                        BigDecimal.ZERO,
-                        BigDecimal::add
-                );
+        BigDecimal total =
+                BigDecimal.ZERO;
+
+
+        for (QuarterlyFinancials financials : window) {
+
+            BigDecimal operatingIncome =
+                    financials.operatingIncome();
+
+
+            if (operatingIncome == null) {
+
+                return null;
+            }
+
+
+            total =
+                    total.add(
+                            operatingIncome
+                    );
+        }
+
+
+        return total;
     }
 
 
@@ -149,7 +164,6 @@ public class TtmFinancialsCalculator {
                 );
     }
 
-
     private boolean hasMissingFinancialData(
             List<QuarterlyFinancials> window
     ) {
@@ -158,11 +172,9 @@ public class TtmFinancialsCalculator {
                 .anyMatch(
                         financials ->
                                 financials.revenue() == null
-                                        || financials.operatingIncome() == null
                                         || financials.netIncome() == null
                 );
     }
-
 
     private LocalDate latestFiledDate(
             List<QuarterlyFinancials> window
