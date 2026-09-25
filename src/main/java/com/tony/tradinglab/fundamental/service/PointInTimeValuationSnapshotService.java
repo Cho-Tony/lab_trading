@@ -76,12 +76,6 @@ public class PointInTimeValuationSnapshotService {
 
         if (stockOptional.isEmpty()) {
 
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> stock not found"
-            );
-
             return Optional.empty();
         }
 
@@ -103,13 +97,6 @@ public class PointInTimeValuationSnapshotService {
 
 
         if (statements.isEmpty()) {
-
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> no fundamental statements as of "
-                            + observationDate
-            );
 
             return Optional.empty();
         }
@@ -189,12 +176,6 @@ public class PointInTimeValuationSnapshotService {
 
 
         if (fundamentalOptional.isEmpty()) {
-
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> fundamental analysis unavailable"
-            );
 
             return Optional.empty();
         }
@@ -282,18 +263,6 @@ public class PointInTimeValuationSnapshotService {
 
         if (ttmCashFlowOptional.isEmpty()) {
 
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> TTM cash flow unavailable"
-                            + " | target="
-                            + ttmFinancials.fiscalYear()
-                            + " "
-                            + ttmFinancials.fiscalQuarter()
-                            + " | quarterlyCashFlows="
-                            + quarterlyCashFlows.size()
-            );
-
             return Optional.empty();
         }
 
@@ -334,12 +303,6 @@ public class PointInTimeValuationSnapshotService {
 
         if (sharesOptional.isEmpty()) {
 
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> valid shares outstanding unavailable"
-            );
-
             return Optional.empty();
         }
 
@@ -357,12 +320,6 @@ public class PointInTimeValuationSnapshotService {
 
 
         if (priceOptional.isEmpty()) {
-
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> market price unavailable"
-            );
 
             return Optional.empty();
         }
@@ -407,17 +364,6 @@ public class PointInTimeValuationSnapshotService {
                                 fundamental.growth(),
                                 fundamental.profitability()
                         );
-
-
-        if (snapshotOptional.isEmpty()) {
-
-            System.out.println(
-                    "[SNAPSHOT] "
-                            + normalizedSymbol
-                            + " -> snapshot factory rejected input"
-            );
-        }
-
 
         return snapshotOptional;
     }

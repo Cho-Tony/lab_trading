@@ -136,34 +136,6 @@ public class SecFundamentalDataClient
                         symbol
                 );
 
-        if ("CRWD".equalsIgnoreCase(symbol)) {
-
-            factExtractor.printMatchingTags(
-                    response,
-                    symbol,
-                    List.of(
-                            "revenue",
-                            "sales",
-                            "subscription",
-                            "service"
-                    )
-            );
-        }
-
-
-        if ("IBM".equalsIgnoreCase(symbol)) {
-
-            factExtractor.printMatchingTags(
-                    response,
-                    symbol,
-                    List.of(
-                            "operating",
-                            "income",
-                            "profit"
-                    )
-            );
-        }
-
         List<SecFactPoint> revenueFacts =
                 factExtractor.extract(
                         response,
@@ -177,16 +149,6 @@ public class SecFundamentalDataClient
                         revenueFacts
                 );
 
-        if ("CRWD".equalsIgnoreCase(symbol)) {
-
-            System.out.println(
-                    "[SEC DEBUG] CRWD"
-                            + " | revenueFacts="
-                            + revenueFacts.size()
-                            + " | normalizedRevenues="
-                            + revenues.size()
-            );
-        }
 
 //        List<QuarterlyFact> revenues =
 //                quarterNormalizer.normalize(

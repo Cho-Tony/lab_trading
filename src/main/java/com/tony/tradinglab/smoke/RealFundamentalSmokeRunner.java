@@ -33,25 +33,83 @@ public class RealFundamentalSmokeRunner
     private final PointInTimeValuationComparisonService
             pointInTimeValuationComparisonService;
 
-
     @Override
     public void run(
             String... args
     ) {
 
-        LocalDate observationDate =
+        List<LocalDate> validationDates =
+                List.of(
+                        LocalDate.of(2024, 12, 31),
+                        LocalDate.of(2025, 3, 31),
+                        LocalDate.of(2025, 6, 30),
+                        LocalDate.of(2025, 9, 30),
+                        LocalDate.of(2025, 12, 31),
+                        LocalDate.of(2026, 3, 31),
+                        LocalDate.of(2026, 7, 31)
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " PIT HISTORICAL VALIDATION"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        for (LocalDate validationDate : validationDates) {
+
+            validateSnapshotCreation(
+                    validationDate
+            );
+        }
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " END PIT HISTORICAL VALIDATION"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+
+        /*
+         * 기존 상세 valuation comparison은
+         * 가장 최근 검증 시점으로 계속 수행한다.
+         */
+        runValuationComparison(
                 LocalDate.of(
                         2026,
                         7,
                         31
-                );
+                )
+        );
+    }
 
+    private void validateSnapshotCreation(
+            LocalDate observationDate
+    ) {
 
         List<UniverseTarget> targets =
                 ValuationUniverse.targets();
 
+
         List<ValuationPeerSnapshotInput> inputs =
                 new ArrayList<>();
+
 
         List<String> snapshotFailures =
                 new ArrayList<>();
@@ -87,6 +145,112 @@ public class RealFundamentalSmokeRunner
         }
 
 
+        Set<String> createdSymbols =
+                inputs.stream()
+                        .map(
+                                ValuationPeerSnapshotInput::symbol
+                        )
+                        .collect(
+                                Collectors.toSet()
+                        );
+
+
+        List<String> missingSymbols =
+                targets.stream()
+                        .map(
+                                UniverseTarget::symbol
+                        )
+                        .filter(
+                                symbol ->
+                                        !createdSymbols.contains(
+                                                symbol
+                                        )
+                        )
+                        .toList();
+
+
+        System.out.println();
+        System.out.println(
+                "As Of = "
+                        + observationDate
+        );
+
+        System.out.println(
+                "Snapshot Created = "
+                        + inputs.size()
+                        + " / "
+                        + targets.size()
+        );
+
+
+        if (!missingSymbols.isEmpty()) {
+
+            System.out.println(
+                    "Missing = "
+                            + missingSymbols
+            );
+        }
+
+
+        if (!snapshotFailures.isEmpty()) {
+
+            System.out.println(
+                    "Failures:"
+            );
+
+            snapshotFailures.forEach(
+                    failure ->
+                            System.out.println(
+                                    " - " + failure
+                            )
+            );
+        }
+    }
+
+    private void runValuationComparison(
+            LocalDate observationDate
+    ) {
+
+        List<UniverseTarget> targets =
+                ValuationUniverse.targets();
+
+
+        List<ValuationPeerSnapshotInput> inputs =
+                new ArrayList<>();
+
+
+        List<String> snapshotFailures =
+                new ArrayList<>();
+
+
+        for (UniverseTarget target : targets) {
+
+            try {
+
+                pointInTimeValuationSnapshotService
+                        .analyze(
+                                target.symbol(),
+                                target.exchange(),
+                                observationDate
+                        )
+                        .ifPresentOrElse(
+                                inputs::add,
+                                () ->
+                                        snapshotFailures.add(
+                                                target.symbol()
+                                                        + " -> snapshot unavailable"
+                                        )
+                        );
+
+            } catch (RuntimeException e) {
+
+                snapshotFailures.add(
+                        target.symbol()
+                                + " -> "
+                                + e.getMessage()
+                );
+            }
+        }
 
 
         Set<String> createdSymbols =
@@ -187,6 +351,7 @@ public class RealFundamentalSmokeRunner
                             + missingSymbols
             );
         }
+
 
         if (!snapshotFailures.isEmpty()) {
 
@@ -338,4 +503,5 @@ public class RealFundamentalSmokeRunner
                 "======================================"
         );
     }
+
 }

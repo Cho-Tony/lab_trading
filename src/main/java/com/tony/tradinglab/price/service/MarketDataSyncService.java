@@ -6,6 +6,7 @@ import com.tony.tradinglab.price.domain.StockPrice;
 import com.tony.tradinglab.price.repository.StockPriceRepository;
 import com.tony.tradinglab.stock.domain.Stock;
 import com.tony.tradinglab.stock.repository.StockRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.Set;
 
 @Service
+@Slf4j
 public class MarketDataSyncService {
 
     private final MarketDataClient marketDataClient;
@@ -318,13 +320,11 @@ public class MarketDataSyncService {
         if (existingPrices.isEmpty()) {
 
             List<DailyPrice> dailyPrices =
-                    marketDataClient
-                            .getDailyPrices(
-                                    normalizedSymbol,
-                                    startDate,
-                                    endDate.plusDays(1)
-                            );
-
+                    fetchDailyPrices(
+                            normalizedSymbol,
+                            startDate,
+                            endDate.plusDays(1)
+                    );
 
             if (dailyPrices == null
                     || dailyPrices.isEmpty()) {
@@ -422,12 +422,11 @@ public class MarketDataSyncService {
 
 
             List<DailyPrice> earlierPrices =
-                    marketDataClient
-                            .getDailyPrices(
-                                    normalizedSymbol,
-                                    startDate,
-                                    missingEndDate.plusDays(1)
-                            );
+                    fetchDailyPrices(
+                            normalizedSymbol,
+                            startDate,
+                            missingEndDate.plusDays(1)
+                    );
 
 
             if (earlierPrices != null
@@ -498,12 +497,11 @@ public class MarketDataSyncService {
 
 
             List<DailyPrice> laterPrices =
-                    marketDataClient
-                            .getDailyPrices(
-                                    normalizedSymbol,
-                                    missingStartDate,
-                                    endDate.plusDays(1)
-                            );
+                    fetchDailyPrices(
+                            normalizedSymbol,
+                            missingStartDate,
+                            endDate.plusDays(1)
+                    );
 
 
             if (laterPrices != null
@@ -565,5 +563,74 @@ public class MarketDataSyncService {
 
 
         return insertedCount;
+    }
+
+    private List<DailyPrice> fetchDailyPrices(
+            String symbol,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+
+        long startedAt =
+                System.currentTimeMillis();
+
+
+        log.info(
+                "[TWELVE DATA] START | symbol={} | start={} | end={}",
+                symbol,
+                startDate,
+                endDate
+        );
+
+
+        try {
+
+            List<DailyPrice> prices =
+                    marketDataClient.getDailyPrices(
+                            symbol,
+                            startDate,
+                            endDate
+                    );
+
+
+            long elapsed =
+                    System.currentTimeMillis()
+                            - startedAt;
+
+
+            log.info(
+                    "[TWELVE DATA] END | symbol={} | start={} | end={} | count={} | elapsed={}ms",
+                    symbol,
+                    startDate,
+                    endDate,
+                    prices == null
+                            ? 0
+                            : prices.size(),
+                    elapsed
+            );
+
+
+            return prices;
+
+        } catch (RuntimeException e) {
+
+            long elapsed =
+                    System.currentTimeMillis()
+                            - startedAt;
+
+
+            log.error(
+                    "[TWELVE DATA] FAIL | symbol={} | start={} | end={} | elapsed={}ms | message={}",
+                    symbol,
+                    startDate,
+                    endDate,
+                    elapsed,
+                    e.getMessage(),
+                    e
+            );
+
+
+            throw e;
+        }
     }
 }

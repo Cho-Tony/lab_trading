@@ -28,10 +28,10 @@ sec:
 valuation-universe:
   classification-effective-from: 2026-07-31
   classification-source: MANUAL
-  price-start-date: 2026-01-01
+  price-start-date: 2024-12-01
   price-end-date: 2026-07-31
 
-logging:
-  level:
-    org.hibernate.SQL: DEBUG
-    org.hibernate.orm.jdbc.bind: TRACE
+#logging:
+#  level:
+#    org.hibernate.SQL: DEBUG
+#    org.hibernate.orm.jdbc.bind: TRACE
