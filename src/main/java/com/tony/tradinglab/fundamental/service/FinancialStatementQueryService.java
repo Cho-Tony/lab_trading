@@ -9,7 +9,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -51,7 +54,6 @@ public class FinancialStatementQueryService {
                 .toList();
     }
 
-
     public List<FinancialStatementData> findAsOf(
             String symbol,
             String exchange,
@@ -73,25 +75,70 @@ public class FinancialStatementQueryService {
                 );
 
 
-        return financialStatementRepository
-                .findByStockIdAndFiledDateLessThanEqualOrderByPeriodEndDateAscFiledDateAsc(
-                        stock.getId(),
-                        asOfDate
-                )
+        List<FinancialStatementData> statements =
+                financialStatementRepository
+                        .findByStockIdAndFiledDateLessThanEqualOrderByPeriodEndDateAscFiledDateAsc(
+                                stock.getId(),
+                                asOfDate
+                        )
 
+                        .stream()
+
+                        .map(
+                                entity ->
+                                        toData(
+                                                stock.getSymbol(),
+                                                entity
+                                        )
+                        )
+
+                        .filter(
+                                data ->
+                                        data.fiscalYear() != null
+                                                && data.fiscalQuarter() != null
+                        )
+
+                        .toList();
+
+
+        Map<String, FinancialStatementData> latestByQuarter =
+                statements.stream()
+
+                        .collect(
+                                Collectors.toMap(
+
+                                        data ->
+                                                data.fiscalYear()
+                                                        + "-"
+                                                        + data.fiscalQuarter(),
+
+                                        data ->
+                                                data,
+
+                                        this::selectLatestStatement
+                                )
+                        );
+
+
+        return latestByQuarter.values()
                 .stream()
 
-                .map(
-                        entity ->
-                                toData(
-                                        stock.getSymbol(),
-                                        entity
+                .sorted(
+                        Comparator
+                                .comparing(
+                                        FinancialStatementData::fiscalYear
+                                )
+
+                                .thenComparingInt(
+                                        data ->
+                                                quarterNumber(
+                                                        data.fiscalQuarter()
+                                                )
                                 )
                 )
 
                 .toList();
     }
-
 
     private Stock findStock(
             String symbol,
@@ -172,5 +219,69 @@ public class FinancialStatementQueryService {
 
                 entity.getSharesOutstanding()
         );
+    }
+
+    private FinancialStatementData selectLatestStatement(
+            FinancialStatementData first,
+            FinancialStatementData second
+    ) {
+
+        int filedDateComparison =
+                first.filedDate()
+                        .compareTo(
+                                second.filedDate()
+                        );
+
+
+        /*
+         * 더 늦게 공개된 공시가
+         * 해당 시점에서 더 최신 정보다.
+         */
+        if (filedDateComparison < 0) {
+            return second;
+        }
+
+
+        if (filedDateComparison > 0) {
+            return first;
+        }
+
+
+        /*
+         * filedDate가 동일한 경우,
+         * 같은 filing 안에 포함된 전년 동기 비교값일 수 있다.
+         *
+         * 이 경우 실제 해당 FY/Q에 가까운
+         * 더 최신 periodEndDate를 사용한다.
+         */
+        if (first.periodEndDate()
+                .isBefore(
+                        second.periodEndDate()
+                )) {
+
+            return second;
+        }
+
+
+        return first;
+    }
+
+    private int quarterNumber(
+            String fiscalQuarter
+    ) {
+
+        return switch (fiscalQuarter) {
+
+            case "Q1" -> 1;
+            case "Q2" -> 2;
+            case "Q3" -> 3;
+            case "Q4" -> 4;
+
+            default ->
+                    throw new IllegalArgumentException(
+                            "지원하지 않는 fiscalQuarter: "
+                                    + fiscalQuarter
+                    );
+        };
     }
 }

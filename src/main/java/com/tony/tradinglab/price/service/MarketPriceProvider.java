@@ -29,9 +29,6 @@ public class MarketPriceProvider {
 
     private final StockPriceRepository stockPriceRepository;
 
-    private final MarketDataSyncService marketDataSyncService;
-
-
     public Optional<StockPrice> getAsOf(
             String symbol,
             String exchange,
@@ -79,7 +76,6 @@ public class MarketPriceProvider {
                                 normalizedSymbol,
                                 normalizedExchange
                         )
-
                         .orElseThrow(
                                 () ->
                                         new IllegalStateException(
@@ -92,9 +88,10 @@ public class MarketPriceProvider {
 
 
         /*
-         * 1.
-         * 먼저 DB에서 observationDate 이하의
-         * 가장 최근 가격을 찾는다.
+         * MarketPriceProvider는 조회만 담당한다.
+         *
+         * 가격 데이터 적재는
+         * MarketDataSyncService.syncRange()의 책임이다.
          */
         Optional<StockPrice> stored =
                 stockPriceRepository
@@ -104,18 +101,6 @@ public class MarketPriceProvider {
                         );
 
 
-        /*
-         * 2.
-         * 충분히 최근 데이터가 DB에 있다면
-         * API를 호출하지 않고 바로 반환.
-         *
-         * 예:
-         *
-         * observationDate = 일요일
-         * DB latest       = 금요일
-         *
-         * → 정상적인 가격이므로 API 호출 X
-         */
         if (stored.isPresent()
                 && isRecentEnough(
                 stored.get(),
@@ -123,56 +108,6 @@ public class MarketPriceProvider {
         )) {
 
             return stored;
-        }
-
-
-        /*
-         * 3.
-         * DB에 가격이 없거나
-         * 너무 오래된 가격밖에 없다면
-         *
-         * observationDate 이전 10일 정도를
-         * Twelve Data에서 backfill한다.
-         */
-        LocalDate backfillStart =
-                observationDate.minusDays(
-                        10
-                );
-
-
-        marketDataSyncService.syncRange(
-                normalizedSymbol,
-                normalizedExchange,
-                backfillStart,
-                observationDate
-        );
-
-
-        /*
-         * 4.
-         * API 응답을 직접 반환하지 않고
-         * 반드시 DB에서 다시 읽는다.
-         */
-        Optional<StockPrice> refreshed =
-                stockPriceRepository
-                        .findTopByStockIdAndTradeDateLessThanEqualOrderByTradeDateDesc(
-                                stock.getId(),
-                                observationDate
-                        );
-
-
-        /*
-         * API 호출 후에도
-         * 너무 오래된 가격밖에 없다면
-         * 사용할 수 없는 데이터로 본다.
-         */
-        if (refreshed.isPresent()
-                && isRecentEnough(
-                refreshed.get(),
-                observationDate
-        )) {
-
-            return refreshed;
         }
 
 

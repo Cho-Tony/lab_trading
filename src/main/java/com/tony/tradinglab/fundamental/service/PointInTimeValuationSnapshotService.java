@@ -37,7 +37,6 @@ public class PointInTimeValuationSnapshotService {
     private final ValuationPeerSnapshotInputFactory
             snapshotInputFactory;
 
-
     public Optional<ValuationPeerSnapshotInput> analyze(
             String symbol,
             String exchange,
@@ -99,6 +98,36 @@ public class PointInTimeValuationSnapshotService {
         if (statements.isEmpty()) {
 
             return Optional.empty();
+        }
+
+
+        /*
+         * PIT safety check.
+         *
+         * observationDate 이후에 공개된 재무 데이터가
+         * 하나라도 섞여 있으면 look-ahead bias이므로
+         * 즉시 실패시킨다.
+         */
+        boolean hasFutureStatement =
+                statements.stream()
+                        .anyMatch(
+                                statement ->
+                                        statement.filedDate() == null
+                                                || statement.filedDate()
+                                                .isAfter(
+                                                        observationDate
+                                                )
+                        );
+
+
+        if (hasFutureStatement) {
+
+            throw new IllegalStateException(
+                    "Future financial statement detected: "
+                            + normalizedSymbol
+                            + " / observationDate="
+                            + observationDate
+            );
         }
 
 
@@ -269,8 +298,6 @@ public class PointInTimeValuationSnapshotService {
 
         /*
          * 5. PIT Shares Outstanding
-         *
-         * null뿐 아니라 0 이하도 valuation 입력으로 사용할 수 없다.
          */
         Optional<BigDecimal> sharesOptional =
                 statements.stream()
@@ -330,6 +357,29 @@ public class PointInTimeValuationSnapshotService {
 
 
         /*
+         * PIT safety check.
+         *
+         * observationDate 이후의 가격을 사용하면
+         * 미래 가격을 본 것이므로 즉시 실패시킨다.
+         */
+        if (price.getTradeDate() == null
+                || price.getTradeDate()
+                .isAfter(
+                        observationDate
+                )) {
+
+            throw new IllegalStateException(
+                    "Future market price detected: "
+                            + normalizedSymbol
+                            + " / observationDate="
+                            + observationDate
+                            + " / priceDate="
+                            + price.getTradeDate()
+            );
+        }
+
+
+        /*
          * 7. Valuation
          */
         ValuationMetrics valuation =
@@ -351,21 +401,18 @@ public class PointInTimeValuationSnapshotService {
         /*
          * 8. Peer Snapshot Input
          */
-        Optional<ValuationPeerSnapshotInput> snapshotOptional =
-                snapshotInputFactory
-                        .create(
+        return snapshotInputFactory
+                .create(
 
-                                stock.getId(),
-                                normalizedSymbol,
-                                observationDate,
+                        stock.getId(),
+                        normalizedSymbol,
+                        observationDate,
 
-                                valuation,
+                        valuation,
 
-                                fundamental.growth(),
-                                fundamental.profitability()
-                        );
-
-        return snapshotOptional;
+                        fundamental.growth(),
+                        fundamental.profitability()
+                );
     }
 
 }
