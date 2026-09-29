@@ -1,5 +1,8 @@
 package com.tony.tradinglab.smoke;
 
+import com.tony.tradinglab.discovery.quant.QuantDiscoveryCandidate;
+import com.tony.tradinglab.discovery.quant.QuantDiscoveryEngine;
+import com.tony.tradinglab.discovery.quant.QuantScoreBreakdown;
 import com.tony.tradinglab.fundamental.domain.PercentileValuationAssessment;
 import com.tony.tradinglab.fundamental.domain.RegressionAdjustedValuationAssessment;
 import com.tony.tradinglab.fundamental.domain.RobustZScoreValuationAssessment;
@@ -17,7 +20,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,6 +34,8 @@ public class RealFundamentalSmokeRunner
 
     private final PointInTimeValuationComparisonService
             pointInTimeValuationComparisonService;
+
+    private final QuantDiscoveryEngine quantDiscoveryEngine;
 
     @Override
     public void run(
@@ -97,6 +101,8 @@ public class RealFundamentalSmokeRunner
                         31
                 )
         );
+
+        testQuantDiscovery();
     }
 
     private void validateSnapshotCreation(
@@ -497,6 +503,213 @@ public class RealFundamentalSmokeRunner
 
         System.out.println(
                 " END"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+    }
+    private void testQuantDiscovery() {
+
+        LocalDate observationDate =
+                LocalDate.of(
+                        2026,
+                        7,
+                        31
+                );
+
+
+        List<UniverseTarget> targets =
+                ValuationUniverse.targets();
+
+
+        List<QuantDiscoveryCandidate> candidates =
+                quantDiscoveryEngine.discover(
+                        observationDate
+                );
+
+
+        Set<String> candidateSymbols =
+                candidates.stream()
+                        .map(
+                                QuantDiscoveryCandidate::symbol
+                        )
+                        .collect(
+                                Collectors.toSet()
+                        );
+
+
+        List<String> missingSymbols =
+                targets.stream()
+                        .map(
+                                UniverseTarget::symbol
+                        )
+                        .filter(
+                                symbol ->
+                                        !candidateSymbols.contains(
+                                                symbol
+                                        )
+                        )
+                        .toList();
+
+
+        boolean invalidObservationDate =
+                candidates.stream()
+                        .anyMatch(
+                                candidate ->
+                                        !observationDate.equals(
+                                                candidate.observationDate()
+                                        )
+                        );
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " QUANT DISCOVERY"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                "Observation Date = "
+                        + observationDate
+        );
+
+        System.out.println(
+                "Universe Count = "
+                        + targets.size()
+        );
+
+        System.out.println(
+                "Candidate Count = "
+                        + candidates.size()
+        );
+
+
+        if (!missingSymbols.isEmpty()) {
+
+            System.out.println(
+                    "Missing Symbols = "
+                            + missingSymbols
+            );
+        }
+
+
+        if (invalidObservationDate) {
+
+            throw new IllegalStateException(
+                    "Quant Discovery candidate에 잘못된 observationDate가 포함되어 있습니다."
+            );
+        }
+
+
+        if (candidates.size()
+                != targets.size()) {
+
+            throw new IllegalStateException(
+                    "Quant Discovery candidate count mismatch. "
+                            + "expected="
+                            + targets.size()
+                            + ", actual="
+                            + candidates.size()
+            );
+        }
+
+
+        if (candidateSymbols.size()
+                != candidates.size()) {
+
+            throw new IllegalStateException(
+                    "Quant Discovery candidate에 중복 symbol이 존재합니다."
+            );
+        }
+
+
+        System.out.println();
+        System.out.println(
+                "----- SELECTED SCORES -----"
+        );
+
+
+        List<String> selectedSymbols =
+                List.of(
+                        "NVDA",
+                        "MSFT",
+                        "AAPL"
+                );
+
+
+        candidates.stream()
+
+                .filter(
+                        candidate ->
+                                selectedSymbols.contains(
+                                        candidate.symbol()
+                                )
+                )
+
+                .forEach(
+                        candidate -> {
+
+                            QuantScoreBreakdown score =
+                                    candidate.score();
+
+
+                            System.out.println(
+                                    candidate.symbol()
+                                            + " | Growth="
+                                            + score.growthScore()
+                                            + " | Quality="
+                                            + score.qualityScore()
+                                            + " | Valuation="
+                                            + score.valuationScore()
+                                            + " | Total="
+                                            + score.totalScore()
+                            );
+                        }
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "----- TOP 10 GROWTH SCORE -----"
+        );
+
+
+        candidates.stream()
+
+                .sorted(
+                        (first, second) ->
+                                second.score()
+                                        .growthScore()
+                                        .compareTo(
+                                                first.score()
+                                                        .growthScore()
+                                        )
+                )
+
+                .limit(10)
+
+                .forEach(
+                        candidate ->
+                                System.out.println(
+                                        candidate.symbol()
+                                                + " | Growth="
+                                                + candidate.score()
+                                                .growthScore()
+                                )
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "Quant Discovery Validation = SUCCESS"
         );
 
         System.out.println(
