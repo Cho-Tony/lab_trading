@@ -2,7 +2,10 @@ package com.tony.tradinglab.discovery.quant;
 
 import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshotInput;
 import org.springframework.stereotype.Component;
+import com.tony.tradinglab.fundamental.domain.ValuationComparisonResult;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -22,7 +25,8 @@ public class DefaultQuantScorer
 
     @Override
     public QuantScoreBreakdown score(
-            ValuationPeerSnapshotInput snapshot
+            ValuationPeerSnapshotInput snapshot,
+            ValuationComparisonResult valuationComparison
     ) {
 
         if (snapshot == null) {
@@ -42,25 +46,40 @@ public class DefaultQuantScorer
                 );
 
 
-        /*
-         * 아직 구현하지 않은 영역.
-         */
         BigDecimal qualityScore =
-                ZERO;
+                calculateQualityScore(
+                        snapshot
+                );
+
 
         BigDecimal valuationScore =
-                ZERO;
+                calculateValuationScore(
+                        valuationComparison
+                );
 
 
         /*
-         * 현재는 Growth Score만 구현되어 있으므로
-         * totalScore 역시 Growth Score와 동일하게 둔다.
+         * 현재는 세 영역을 동일 가중치로 둔다.
          *
-         * Quality / Valuation 구현 후
-         * 최종 가중합으로 변경한다.
+         * Growth    1/3
+         * Quality   1/3
+         * Valuation 1/3
+         *
+         * 가중치는 나중에 PIT 백테스트로 결정한다.
          */
         BigDecimal totalScore =
-                growthScore;
+                growthScore
+                        .add(
+                                qualityScore
+                        )
+                        .add(
+                                valuationScore
+                        )
+                        .divide(
+                                BigDecimal.valueOf(3),
+                                2,
+                                RoundingMode.HALF_UP
+                        );
 
 
         return new QuantScoreBreakdown(
@@ -70,8 +89,6 @@ public class DefaultQuantScorer
                 totalScore
         );
     }
-
-
     private BigDecimal calculateGrowthScore(
             ValuationPeerSnapshotInput snapshot
     ) {
@@ -203,5 +220,306 @@ public class DefaultQuantScorer
 
 
         return value;
+    }
+
+    private BigDecimal calculateQualityScore(
+            ValuationPeerSnapshotInput snapshot
+    ) {
+
+        if (snapshot.valuation() == null) {
+            return ZERO;
+        }
+
+
+        BigDecimal revenue =
+                snapshot.valuation()
+                        .ttmRevenue();
+
+        BigDecimal netIncome =
+                snapshot.valuation()
+                        .ttmNetIncome();
+
+        BigDecimal freeCashFlow =
+                snapshot.valuation()
+                        .ttmFreeCashFlow();
+
+
+        if (revenue == null
+                || revenue.signum() <= 0) {
+
+            return ZERO;
+        }
+
+
+        /*
+         * TTM Net Margin
+         */
+        BigDecimal netMarginPct =
+                calculateMarginPct(
+                        netIncome,
+                        revenue
+                );
+
+
+        /*
+         * TTM Free Cash Flow Margin
+         */
+        BigDecimal fcfMarginPct =
+                calculateMarginPct(
+                        freeCashFlow,
+                        revenue
+                );
+
+
+        /*
+         * Net Margin 최대 45점.
+         *
+         * 20% margin이면 약 절반 수준,
+         * 이후에는 diminishing return.
+         */
+        BigDecimal netMarginScore =
+                calculateMarginScore(
+                        netMarginPct,
+                        BigDecimal.valueOf(20),
+                        BigDecimal.valueOf(45)
+                );
+
+
+        /*
+         * FCF Margin 최대 45점.
+         */
+        BigDecimal fcfMarginScore =
+                calculateMarginScore(
+                        fcfMarginPct,
+                        BigDecimal.valueOf(20),
+                        BigDecimal.valueOf(45)
+                );
+
+
+        /*
+         * 수익성 개선 추세 최대 ±10점.
+         *
+         * ProfitabilityTrendAnalysis 자체가
+         * unavailable인 기업도 있으므로
+         * 이 부분은 optional bonus/penalty로 취급한다.
+         */
+        BigDecimal trendAdjustment =
+                ZERO;
+
+
+        if (snapshot.profitability() != null) {
+
+            BigDecimal operatingMarginChange =
+                    snapshot.profitability()
+                            .averageOperatingMarginChangePctPoint();
+
+            BigDecimal netMarginChange =
+                    snapshot.profitability()
+                            .averageNetMarginChangePctPoint();
+
+
+            if (operatingMarginChange != null) {
+
+                trendAdjustment =
+                        trendAdjustment.add(
+                                operatingMarginChange
+                        );
+            }
+
+
+            if (netMarginChange != null) {
+
+                trendAdjustment =
+                        trendAdjustment.add(
+                                netMarginChange
+                        );
+            }
+
+
+            trendAdjustment =
+                    clamp(
+                            trendAdjustment,
+                            BigDecimal.valueOf(-10),
+                            BigDecimal.valueOf(10)
+                    );
+        }
+
+
+        BigDecimal score =
+                netMarginScore
+                        .add(
+                                fcfMarginScore
+                        )
+                        .add(
+                                trendAdjustment
+                        );
+
+
+        return clamp(
+                score,
+                ZERO,
+                HUNDRED
+        ).setScale(
+                2,
+                RoundingMode.HALF_UP
+        );
+    }
+
+    private BigDecimal calculateMarginPct(
+            BigDecimal value,
+            BigDecimal revenue
+    ) {
+
+        if (value == null
+                || revenue == null
+                || revenue.signum() <= 0) {
+
+            return ZERO;
+        }
+
+
+        return value
+                .multiply(
+                        HUNDRED
+                )
+                .divide(
+                        revenue,
+                        4,
+                        RoundingMode.HALF_UP
+                );
+    }
+
+    private BigDecimal calculateMarginScore(
+            BigDecimal marginPct,
+            BigDecimal halfSaturationPoint,
+            BigDecimal maxScore
+    ) {
+
+        if (marginPct == null
+                || marginPct.signum() <= 0) {
+
+            return ZERO;
+        }
+
+
+        /*
+         * diminishing return:
+         *
+         * margin
+         * --------------------- × maxScore
+         * margin + 기준값
+         *
+         * 기준값이 20이면:
+         *
+         * margin 10% → 최대점수의 약 33%
+         * margin 20% → 최대점수의 50%
+         * margin 40% → 최대점수의 약 67%
+         */
+        return marginPct
+                .multiply(
+                        maxScore
+                )
+                .divide(
+                        marginPct.add(
+                                halfSaturationPoint
+                        ),
+                        4,
+                        RoundingMode.HALF_UP
+                );
+    }
+
+    private BigDecimal calculateValuationScore(
+            ValuationComparisonResult comparison
+    ) {
+
+        if (comparison == null
+                || comparison.percentile() == null) {
+
+            return ZERO;
+        }
+
+
+        List<BigDecimal> scores =
+                new ArrayList<>();
+
+
+        BigDecimal pePercentile =
+                comparison.percentile()
+                        .pePercentile();
+
+        BigDecimal psPercentile =
+                comparison.percentile()
+                        .psPercentile();
+
+        BigDecimal priceToFcfPercentile =
+                comparison.percentile()
+                        .priceToFcfPercentile();
+
+
+        /*
+         * Percentile이 낮을수록
+         * peer 대비 multiple이 낮다는 뜻이므로
+         *
+         * Valuation Score = 100 - Percentile
+         *
+         * 예:
+         *
+         * percentile 20
+         * → valuation score 80
+         *
+         * percentile 80
+         * → valuation score 20
+         */
+        if (pePercentile != null) {
+
+            scores.add(
+                    HUNDRED.subtract(
+                            pePercentile
+                    )
+            );
+        }
+
+
+        if (psPercentile != null) {
+
+            scores.add(
+                    HUNDRED.subtract(
+                            psPercentile
+                    )
+            );
+        }
+
+
+        if (priceToFcfPercentile != null) {
+
+            scores.add(
+                    HUNDRED.subtract(
+                            priceToFcfPercentile
+                    )
+            );
+        }
+
+
+        if (scores.isEmpty()) {
+            return ZERO;
+        }
+
+
+        BigDecimal total =
+                scores.stream()
+                        .reduce(
+                                ZERO,
+                                BigDecimal::add
+                        );
+
+
+        return total
+                .divide(
+                        BigDecimal.valueOf(
+                                scores.size()
+                        ),
+                        2,
+                        RoundingMode.HALF_UP
+                );
     }
 }
