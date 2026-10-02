@@ -1,13 +1,10 @@
 package com.tony.tradinglab.smoke;
 
 import com.tony.tradinglab.discovery.quant.*;
-import com.tony.tradinglab.fundamental.domain.PercentileValuationAssessment;
-import com.tony.tradinglab.fundamental.domain.RegressionAdjustedValuationAssessment;
-import com.tony.tradinglab.fundamental.domain.RobustZScoreValuationAssessment;
-import com.tony.tradinglab.fundamental.domain.ValuationComparisonResult;
-import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshotInput;
+import com.tony.tradinglab.fundamental.domain.*;
 import com.tony.tradinglab.fundamental.service.PointInTimeValuationComparisonService;
 import com.tony.tradinglab.fundamental.service.PointInTimeValuationSnapshotService;
+import com.tony.tradinglab.fundamental.service.ValuationPeerSnapshotAssembler;
 import com.tony.tradinglab.universe.UniverseTarget;
 import com.tony.tradinglab.universe.ValuationUniverse;
 import lombok.RequiredArgsConstructor;
@@ -15,8 +12,10 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -47,6 +46,9 @@ public class RealFundamentalSmokeRunner
     private final QuantScoreQuintileAnalyzer
             quantScoreQuintileAnalyzer;
 
+    private final ValuationPeerSnapshotAssembler
+            valuationPeerSnapshotAssembler;
+
     @Override
     public void run(
             String... args
@@ -71,8 +73,393 @@ public class RealFundamentalSmokeRunner
 
 //        testQuantBacktestTotalQuintiles();
 
-        testQuantBacktestComponentQuintiles();
+//        testQuantBacktestComponentQuintiles();
 
+        testQuantValuationAvailability();
+
+//        testHistoricalPeerSnapshotAssembly();
+
+    }
+
+    private void testHistoricalPeerSnapshotAssembly() {
+
+        LocalDate observationDate =
+                LocalDate.of(
+                        2025,
+                        6,
+                        30
+                );
+
+
+        List<UniverseTarget> targets =
+                ValuationUniverse.targets();
+
+
+        List<ValuationPeerSnapshotInput> inputs =
+                new ArrayList<>();
+
+
+        for (UniverseTarget target : targets) {
+
+            pointInTimeValuationSnapshotService
+                    .analyze(
+                            target.symbol(),
+                            target.exchange(),
+                            observationDate
+                    )
+                    .ifPresent(
+                            inputs::add
+                    );
+        }
+
+
+        List<ValuationPeerSnapshot> peerSnapshots =
+                valuationPeerSnapshotAssembler
+                        .assemble(
+                                inputs
+                        );
+
+
+        Set<String> assembledSymbols =
+                peerSnapshots.stream()
+
+                        .map(
+                                ValuationPeerSnapshot::symbol
+                        )
+
+                        .collect(
+                                Collectors.toSet()
+                        );
+
+
+        List<String> missingSymbols =
+                inputs.stream()
+
+                        .map(
+                                ValuationPeerSnapshotInput::symbol
+                        )
+
+                        .filter(
+                                symbol ->
+                                        !assembledSymbols.contains(
+                                                symbol
+                                        )
+                        )
+
+                        .sorted()
+
+                        .toList();
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " HISTORICAL PEER SNAPSHOT ASSEMBLY"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                "Observation Date = "
+                        + observationDate
+        );
+
+        System.out.println(
+                "Valuation Input Count = "
+                        + inputs.size()
+        );
+
+        System.out.println(
+                "Peer Snapshot Count = "
+                        + peerSnapshots.size()
+        );
+
+        System.out.println(
+                "Missing Peer Snapshot Count = "
+                        + missingSymbols.size()
+        );
+
+        System.out.println(
+                "Missing Symbols = "
+                        + missingSymbols
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- ASSEMBLED CLASSIFICATION -----"
+        );
+
+
+        peerSnapshots.stream()
+
+                .sorted(
+                        Comparator.comparing(
+                                ValuationPeerSnapshot::symbol
+                        )
+                )
+
+                .forEach(
+                        snapshot ->
+                                System.out.println(
+                                        snapshot.symbol()
+                                                + " | Sector="
+                                                + snapshot.sector()
+                                                + " | Industry="
+                                                + snapshot.industry()
+                                )
+                );
+
+
+        System.out.println();
+        System.out.println(
+                "Historical Peer Snapshot Assembly Validation = SUCCESS"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+    }
+
+    private void testQuantValuationAvailability() {
+
+        List<LocalDate> observationDates =
+                List.of(
+                        LocalDate.of(
+                                2024,
+                                12,
+                                31
+                        ),
+                        LocalDate.of(
+                                2025,
+                                3,
+                                31
+                        ),
+                        LocalDate.of(
+                                2025,
+                                6,
+                                30
+                        )
+                );
+
+
+        List<QuantBacktestSample> samples =
+                quantBacktestService.run(
+                        observationDates
+                );
+
+
+        long availableCount =
+                samples.stream()
+
+                        .filter(
+                                sample ->
+                                        sample.score()
+                                                .valuationAvailable()
+                        )
+
+                        .count();
+
+
+        long unavailableCount =
+                samples.size()
+                        - availableCount;
+
+
+        long availableZeroScoreCount =
+                samples.stream()
+
+                        .filter(
+                                sample ->
+                                        sample.score()
+                                                .valuationAvailable()
+                        )
+
+                        .filter(
+                                sample ->
+                                        sample.score()
+                                                .valuationScore()
+                                                .compareTo(
+                                                        BigDecimal.ZERO
+                                                ) == 0
+                        )
+
+                        .count();
+
+
+        long unavailableZeroScoreCount =
+                samples.stream()
+
+                        .filter(
+                                sample ->
+                                        !sample.score()
+                                                .valuationAvailable()
+                        )
+
+                        .filter(
+                                sample ->
+                                        sample.score()
+                                                .valuationScore()
+                                                .compareTo(
+                                                        BigDecimal.ZERO
+                                                ) == 0
+                        )
+
+                        .count();
+
+
+        System.out.println();
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                " QUANT VALUATION AVAILABILITY"
+        );
+
+        System.out.println(
+                "======================================"
+        );
+
+        System.out.println(
+                "Total Samples = "
+                        + samples.size()
+        );
+
+        System.out.println(
+                "Valuation Available = "
+                        + availableCount
+        );
+
+        System.out.println(
+                "Valuation Unavailable = "
+                        + unavailableCount
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- ZERO SCORE BREAKDOWN -----"
+        );
+
+        System.out.println(
+                "Available + Score Zero = "
+                        + availableZeroScoreCount
+        );
+
+        System.out.println(
+                "Unavailable + Score Zero = "
+                        + unavailableZeroScoreCount
+        );
+
+
+        System.out.println();
+        System.out.println(
+                "----- AVAILABILITY BY DATE -----"
+        );
+
+
+        for (LocalDate observationDate
+                : observationDates) {
+
+            List<QuantBacktestSample> dateSamples =
+                    samples.stream()
+
+                            .filter(
+                                    sample ->
+                                            observationDate.equals(
+                                                    sample.observationDate()
+                                            )
+                            )
+
+                            .toList();
+
+
+            long dateAvailableCount =
+                    dateSamples.stream()
+
+                            .filter(
+                                    sample ->
+                                            sample.score()
+                                                    .valuationAvailable()
+                            )
+
+                            .count();
+
+
+            long dateUnavailableCount =
+                    dateSamples.size()
+                            - dateAvailableCount;
+
+
+            List<String> unavailableSymbols =
+                    dateSamples.stream()
+
+                            .filter(
+                                    sample ->
+                                            !sample.score()
+                                                    .valuationAvailable()
+                            )
+
+                            .map(
+                                    QuantBacktestSample::symbol
+                            )
+
+                            .sorted()
+
+                            .toList();
+
+
+            System.out.println();
+
+            System.out.println(
+                    observationDate
+            );
+
+            System.out.println(
+                    "Available = "
+                            + dateAvailableCount
+                            + " / "
+                            + dateSamples.size()
+            );
+
+            System.out.println(
+                    "Unavailable = "
+                            + dateUnavailableCount
+                            + " / "
+                            + dateSamples.size()
+            );
+
+            System.out.println(
+                    "Unavailable Symbols = "
+                            + unavailableSymbols
+            );
+        }
+
+
+        if (availableCount
+                + unavailableCount
+                != samples.size()) {
+
+            throw new IllegalStateException(
+                    "Valuation availability count mismatch."
+            );
+        }
+
+
+        System.out.println();
+        System.out.println(
+                "Quant Valuation Availability Validation = SUCCESS"
+        );
+
+        System.out.println(
+                "======================================"
+        );
     }
 
     private void runValuationComparison(

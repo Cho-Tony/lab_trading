@@ -35,6 +35,7 @@ public class DefaultQuantScorer
                     ZERO,
                     ZERO,
                     ZERO,
+                    false,
                     ZERO
             );
         }
@@ -52,6 +53,12 @@ public class DefaultQuantScorer
                 );
 
 
+        boolean valuationAvailable =
+                isValuationAvailable(
+                        valuationComparison
+                );
+
+
         BigDecimal valuationScore =
                 calculateValuationScore(
                         valuationComparison
@@ -59,13 +66,13 @@ public class DefaultQuantScorer
 
 
         /*
-         * 현재는 세 영역을 동일 가중치로 둔다.
+         * 아직 baseline 유지.
          *
-         * Growth    1/3
-         * Quality   1/3
-         * Valuation 1/3
+         * Valuation unavailable인 경우에도 기존과 동일하게
+         * valuationScore=0을 포함하여 평균낸다.
          *
-         * 가중치는 나중에 PIT 백테스트로 결정한다.
+         * 먼저 missing 원인을 확인한 뒤
+         * 계산 방식을 바꿀지 결정한다.
          */
         BigDecimal totalScore =
                 growthScore
@@ -86,9 +93,32 @@ public class DefaultQuantScorer
                 growthScore,
                 qualityScore,
                 valuationScore,
+                valuationAvailable,
                 totalScore
         );
     }
+
+    private boolean isValuationAvailable(
+            ValuationComparisonResult comparison
+    ) {
+
+        if (comparison == null
+                || comparison.percentile() == null) {
+
+            return false;
+        }
+
+
+        return comparison.percentile()
+                .pePercentile() != null
+
+                || comparison.percentile()
+                .psPercentile() != null
+
+                || comparison.percentile()
+                .priceToFcfPercentile() != null;
+    }
+
     private BigDecimal calculateGrowthScore(
             ValuationPeerSnapshotInput snapshot
     ) {

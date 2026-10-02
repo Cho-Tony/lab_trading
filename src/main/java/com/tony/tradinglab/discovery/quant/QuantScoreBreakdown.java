@@ -10,6 +10,8 @@ public record QuantScoreBreakdown(
 
         BigDecimal valuationScore,
 
+        boolean valuationAvailable,
+
         BigDecimal totalScore
 
 ) {
