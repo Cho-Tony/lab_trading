@@ -75,7 +75,7 @@ public class RealFundamentalSmokeRunner
 
 //        testQuantBacktestComponentQuintiles();
 
-        testQuantValuationAvailability();
+//        testQuantValuationAvailability();
 
 //        testHistoricalPeerSnapshotAssembly();
 

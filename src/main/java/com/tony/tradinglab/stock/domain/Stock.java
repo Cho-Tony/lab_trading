@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import static lombok.AccessLevel.PROTECTED;
@@ -50,6 +51,29 @@ public class Stock {
     @Column(name = "updated_at", nullable = false, insertable = false, updatable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "data_source", length = 32)
+    private String dataSource;
+
+
+    @Column(name = "source_security_id", length = 64)
+    private String sourceSecurityId;
+
+
+    @Column(name = "security_type", length = 64)
+    private String securityType;
+
+
+    @Column(name = "listing_start_date")
+    private LocalDate listingStartDate;
+
+
+    @Column(name = "listing_end_date")
+    private LocalDate listingEndDate;
+
+
+    @Column(name = "delisting_reason", length = 255)
+    private String delistingReason;
+
     public Stock(
             String symbol,
             String name,
@@ -62,5 +86,42 @@ public class Stock {
         this.exchange = exchange;
         this.market = market;
         this.currency = currency;
+    }
+
+    public void applyHistoricalMasterData(
+            String name,
+            String market,
+            String currency,
+            boolean active,
+            String dataSource,
+            String sourceSecurityId,
+            String securityType,
+            LocalDate listingStartDate,
+            LocalDate listingEndDate,
+            String delistingReason
+    ) {
+
+        if (name != null && !name.isBlank()) {
+            this.name = name;
+        }
+
+        if (market != null && !market.isBlank()) {
+            this.market = market;
+        }
+
+        if (currency != null && !currency.isBlank()) {
+            this.currency = currency;
+        }
+
+        this.active = active;
+
+        this.dataSource = dataSource;
+        this.sourceSecurityId = sourceSecurityId;
+        this.securityType = securityType;
+
+        this.listingStartDate = listingStartDate;
+        this.listingEndDate = listingEndDate;
+
+        this.delistingReason = delistingReason;
     }
 }
