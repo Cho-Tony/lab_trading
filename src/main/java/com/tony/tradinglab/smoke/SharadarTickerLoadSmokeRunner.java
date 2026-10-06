@@ -8,6 +8,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Profile("sharadar-tickers-smoke")
@@ -16,7 +17,6 @@ public class SharadarTickerLoadSmokeRunner
         implements CommandLineRunner {
 
     private final HistoricalStockMasterSource stockMasterSource;
-
 
     @Override
     public void run(
@@ -40,6 +40,55 @@ public class SharadarTickerLoadSmokeRunner
                         - activeCount;
 
 
+        Map<String, Long> sourceIdCounts =
+                records.stream()
+                        .collect(
+                                java.util.stream.Collectors.groupingBy(
+                                        HistoricalStockMasterRecord::sourceSecurityId,
+                                        java.util.stream.Collectors.counting()
+                                )
+                        );
+
+
+        List<Map.Entry<String, Long>> duplicateSourceIds =
+                sourceIdCounts.entrySet()
+                        .stream()
+                        .filter(
+                                entry -> entry.getValue() > 1
+                        )
+                        .sorted(
+                                Map.Entry.<String, Long>comparingByValue()
+                                        .reversed()
+                        )
+                        .toList();
+
+
+        Map<String, Long> symbolExchangeCounts =
+                records.stream()
+                        .collect(
+                                java.util.stream.Collectors.groupingBy(
+                                        record ->
+                                                record.symbol()
+                                                        + "|"
+                                                        + record.exchange(),
+                                        java.util.stream.Collectors.counting()
+                                )
+                        );
+
+
+        List<Map.Entry<String, Long>> duplicateSymbolExchanges =
+                symbolExchangeCounts.entrySet()
+                        .stream()
+                        .filter(
+                                entry -> entry.getValue() > 1
+                        )
+                        .sorted(
+                                Map.Entry.<String, Long>comparingByValue()
+                                        .reversed()
+                        )
+                        .toList();
+
+
         System.out.println();
         System.out.println(
                 "======================================"
@@ -52,6 +101,7 @@ public class SharadarTickerLoadSmokeRunner
         System.out.println(
                 "======================================"
         );
+
 
         System.out.println(
                 "Total Records = "
@@ -71,6 +121,50 @@ public class SharadarTickerLoadSmokeRunner
 
         System.out.println();
         System.out.println(
+                "----- IDENTITY CHECK -----"
+        );
+
+
+        System.out.println(
+                "Duplicate sourceSecurityId = "
+                        + duplicateSourceIds.size()
+        );
+
+
+        duplicateSourceIds.stream()
+                .limit(20)
+                .forEach(
+                        entry ->
+                                System.out.println(
+                                        "SOURCE ID DUPLICATE: "
+                                                + entry.getKey()
+                                                + " | count="
+                                                + entry.getValue()
+                                )
+                );
+
+
+        System.out.println(
+                "Duplicate symbol+exchange = "
+                        + duplicateSymbolExchanges.size()
+        );
+
+
+        duplicateSymbolExchanges.stream()
+                .limit(20)
+                .forEach(
+                        entry ->
+                                System.out.println(
+                                        "SYMBOL DUPLICATE: "
+                                                + entry.getKey()
+                                                + " | count="
+                                                + entry.getValue()
+                                )
+                );
+
+
+        System.out.println();
+        System.out.println(
                 "----- SAMPLE -----"
         );
 
@@ -78,22 +172,20 @@ public class SharadarTickerLoadSmokeRunner
         records.stream()
                 .limit(20)
                 .forEach(
-                        record -> {
-
-                            System.out.println(
-                                    record.symbol()
-                                            + " | sourceId="
-                                            + record.sourceSecurityId()
-                                            + " | exchange="
-                                            + record.exchange()
-                                            + " | active="
-                                            + record.active()
-                                            + " | sector="
-                                            + record.sector()
-                                            + " | industry="
-                                            + record.industry()
-                            );
-                        }
+                        record ->
+                                System.out.println(
+                                        record.symbol()
+                                                + " | sourceId="
+                                                + record.sourceSecurityId()
+                                                + " | exchange="
+                                                + record.exchange()
+                                                + " | active="
+                                                + record.active()
+                                                + " | sector="
+                                                + record.sector()
+                                                + " | industry="
+                                                + record.industry()
+                                )
                 );
 
 
@@ -101,4 +193,5 @@ public class SharadarTickerLoadSmokeRunner
                 "======================================"
         );
     }
+
 }

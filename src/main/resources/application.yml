@@ -32,7 +32,7 @@ valuation-universe:
   price-end-date: 2026-07-31
 
 sharadar:
-  tickers-file: ${SHARADAR_TICKERS_FILE:}
+  tickers-file: ${SHARADAR_TICKERS_FILE}
 
 
 

@@ -115,13 +115,29 @@ public class Stock {
 
         this.active = active;
 
-        this.dataSource = dataSource;
-        this.sourceSecurityId = sourceSecurityId;
-        this.securityType = securityType;
+        if (dataSource != null && !dataSource.isBlank()) {
+            this.dataSource = dataSource;
+        }
 
-        this.listingStartDate = listingStartDate;
-        this.listingEndDate = listingEndDate;
+        if (sourceSecurityId != null && !sourceSecurityId.isBlank()) {
+            this.sourceSecurityId = sourceSecurityId;
+        }
 
-        this.delistingReason = delistingReason;
+        if (securityType != null && !securityType.isBlank()) {
+            this.securityType = securityType;
+        }
+
+        if (listingStartDate != null) {
+            this.listingStartDate = listingStartDate;
+        }
+
+        if (listingEndDate != null) {
+            this.listingEndDate = listingEndDate;
+        }
+
+        if (delistingReason != null && !delistingReason.isBlank()) {
+            this.delistingReason = delistingReason;
+        }
     }
+
 }

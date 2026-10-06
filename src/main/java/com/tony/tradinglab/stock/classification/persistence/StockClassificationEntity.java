@@ -129,4 +129,33 @@ public class StockClassificationEntity {
 
         this.effectiveTo = effectiveTo;
     }
+
+    public void updateClassification(
+            String sector,
+            String industry,
+            ClassificationSource source
+    ) {
+
+        if (sector == null || sector.isBlank()) {
+            throw new IllegalArgumentException(
+                    "sector는 비어 있을 수 없습니다."
+            );
+        }
+
+        if (industry == null || industry.isBlank()) {
+            throw new IllegalArgumentException(
+                    "industry는 비어 있을 수 없습니다."
+            );
+        }
+
+        if (source == null) {
+            throw new IllegalArgumentException(
+                    "source는 null일 수 없습니다."
+            );
+        }
+
+        this.sector = sector;
+        this.industry = industry;
+        this.source = source;
+    }
 }
