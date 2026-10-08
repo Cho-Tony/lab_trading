@@ -34,7 +34,6 @@ public class HistoricalStockClassificationImportService {
     private static final LocalDate STATIC_EFFECTIVE_FROM =
             LocalDate.of(1900, 1, 1);
 
-
     private final HistoricalStockMasterSource stockMasterSource;
 
     private final StockRepository stockRepository;
@@ -130,7 +129,6 @@ public class HistoricalStockClassificationImportService {
                         created
                 );
 
-
                 inserted++;
 
                 continue;
@@ -213,7 +211,6 @@ public class HistoricalStockClassificationImportService {
             }
         }
 
-
         return result;
     }
 
@@ -223,7 +220,6 @@ public class HistoricalStockClassificationImportService {
 
         Map<Long, StockClassificationEntity> result =
                 new HashMap<>();
-
 
         for (
                 StockClassificationEntity entity
@@ -253,7 +249,6 @@ public class HistoricalStockClassificationImportService {
                 );
             }
         }
-
 
         return result;
     }

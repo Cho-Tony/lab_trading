@@ -96,15 +96,11 @@ public class SharadarTickerMapper {
 
                         SECURITY_TYPE,
 
-                        /*
-                         * firstPriceDate / lastPriceDate는
-                         * listing/delisting date로 간주하지 않는다.
-                         *
-                         * 실제 lifecycle 날짜는
-                         * Corporate Actions 단계에서 채운다.
-                         */
-                        null,
-                        null,
+                        source.firstPriceDate(),
+
+                        source.delisted()
+                                ? source.lastPriceDate()
+                                : null,
 
                         null,
 
