@@ -36,7 +36,9 @@ sharadar:
   stocks-file: C:/DEV2/trading-lab/data/sharadar/stocks.csv.zip
   fundamentals-file: C:/DEV2/trading-lab/data/sharadar/fundamentals.csv.zip
   actions-file: C:/DEV2/trading-lab/data/sharadar/actions.csv.zip
+
   stocks-checkpoint-file: C:/DEV2/trading-lab/data/sharadar/checkpoints/stocks-price-import.chk
+  fundamentals-checkpoint-file: C:/DEV2/trading-lab/data/sharadar/checkpoints/fundamentals-import.chk
 
 
 
