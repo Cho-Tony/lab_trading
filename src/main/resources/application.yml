@@ -32,7 +32,11 @@ valuation-universe:
   price-end-date: 2026-07-31
 
 sharadar:
-  tickers-file: ${SHARADAR_TICKERS_FILE}
+  tickers-file: C:/DEV2/trading-lab/data/sharadar/tickers.csv
+  stocks-file: C:/DEV2/trading-lab/data/sharadar/stocks.csv.zip
+  fundamentals-file: C:/DEV2/trading-lab/data/sharadar/fundamentals.csv.zip
+  actions-file: C:/DEV2/trading-lab/data/sharadar/actions.csv.zip
+  stocks-checkpoint-file: C:/DEV2/trading-lab/data/sharadar/checkpoints/stocks-price-import.chk
 
 
 

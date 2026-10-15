@@ -21,7 +21,7 @@ public final class BacktestDatasetSpec {
     public static final LocalDate OBSERVATION_END =
             LocalDate.of(
                     2025,
-                    6,
+                    9,
                     30
             );
 
@@ -55,7 +55,7 @@ public final class BacktestDatasetSpec {
     public static final LocalDate PRICE_END =
             LocalDate.of(
                     2026,
-                    6,
+                    9,
                     30
             );
 
