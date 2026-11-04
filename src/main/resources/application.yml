@@ -39,7 +39,7 @@ sharadar:
 
   stocks-checkpoint-file: C:/DEV2/trading-lab/data/sharadar/checkpoints/stocks-price-import.chk
   fundamentals-checkpoint-file: C:/DEV2/trading-lab/data/sharadar/checkpoints/fundamentals-import.chk
-
+  actions-checkpoint-file: C:/DEV2/trading-lab/data/sharadar/checkpoints/actions-import.chk
 
 
 #logging:

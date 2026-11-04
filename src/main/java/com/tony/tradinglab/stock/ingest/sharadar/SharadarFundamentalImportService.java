@@ -1777,6 +1777,9 @@ public class SharadarFundamentalImportService {
             )
                     || "calendar_date".equals(
                     column
+            )
+                    || "filing_date".equals(
+                    column
             )) {
 
                 continue;
