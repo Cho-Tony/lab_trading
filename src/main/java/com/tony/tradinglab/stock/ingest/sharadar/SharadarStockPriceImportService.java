@@ -18,7 +18,9 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -82,7 +84,7 @@ public class SharadarStockPriceImportService {
                 validateAndGetPath();
 
 
-        Map<String, Long> stockIdsByTicker =
+        Map<String, List<Stock>> stocksByTicker =
                 buildStockIdIndex();
 
 
@@ -93,7 +95,7 @@ public class SharadarStockPriceImportService {
         log.info(
                 "[SHARADAR PRICE IMPORT] START file={} stocks={} range={}~{} checkpointLine={}",
                 path.toAbsolutePath(),
-                stockIdsByTicker.size(),
+                stocksByTicker.size(),
                 BacktestDatasetSpec.PRICE_START,
                 BacktestDatasetSpec.PRICE_END,
                 checkpointLine
@@ -228,10 +230,10 @@ public class SharadarStockPriceImportService {
 
 
                         Long stockId =
-                                stockIdsByTicker.get(
-                                        normalizeTicker(
-                                                row.ticker()
-                                        )
+                                findStockIdAsOf(
+                                        stocksByTicker,
+                                        row.ticker(),
+                                        row.tradeDate()
                                 );
 
 
@@ -410,9 +412,9 @@ public class SharadarStockPriceImportService {
     }
 
 
-    private Map<String, Long> buildStockIdIndex() {
+    private Map<String, List<Stock>> buildStockIdIndex() {
 
-        Map<String, Long> result =
+        Map<String, List<Stock>> result =
                 new HashMap<>();
 
 
@@ -442,28 +444,33 @@ public class SharadarStockPriceImportService {
                     );
 
 
-            Long previous =
-                    result.put(
-                            ticker,
-                            stock.getId()
-                    );
-
-
-            if (previous != null) {
-
-                throw new IllegalStateException(
-                        "Duplicate Sharadar ticker in stocks table: "
-                                + ticker
-                                + " | stockIds="
-                                + previous
-                                + ","
-                                + stock.getId()
-                );
-            }
+            result.computeIfAbsent(ticker, ignored -> new ArrayList<>()).add(stock);
         }
 
 
         return result;
+    }
+
+    Long findStockIdAsOf(Map<String, List<Stock>> stocksByTicker, String ticker, LocalDate tradeDate) {
+        Long stockId = null;
+        for (Stock stock : stocksByTicker.getOrDefault(normalizeTicker(ticker), List.of())) {
+            if (stock.getListingEndDate() != null && stock.getListingEndDate().isBefore(tradeDate)) {
+                continue;
+            }
+            if (stock.getListingStartDate() == null) {
+                throw new IllegalStateException("Unknown listing start: " + ticker
+                        + " / stockId=" + stock.getId() + " / tradeDate=" + tradeDate);
+            }
+            if (stock.getListingStartDate().isAfter(tradeDate)) {
+                continue;
+            }
+            if (stockId != null) {
+                throw new IllegalStateException("Ambiguous Sharadar ticker: " + ticker
+                        + " / tradeDate=" + tradeDate + " / stockIds=" + stockId + "," + stock.getId());
+            }
+            stockId = stock.getId();
+        }
+        return stockId;
     }
 
 
@@ -960,7 +967,7 @@ public class SharadarStockPriceImportService {
                 validateAndGetPath();
 
 
-        Map<String, Long> stockIdsByTicker =
+        Map<String, List<Stock>> stocksByTicker =
                 buildStockIdIndex();
 
 
@@ -1053,10 +1060,10 @@ public class SharadarStockPriceImportService {
 
 
                 Long stockId =
-                        stockIdsByTicker.get(
-                                normalizeTicker(
-                                        row.ticker()
-                                )
+                        findStockIdAsOf(
+                                stocksByTicker,
+                                row.ticker(),
+                                row.tradeDate()
                         );
 
 

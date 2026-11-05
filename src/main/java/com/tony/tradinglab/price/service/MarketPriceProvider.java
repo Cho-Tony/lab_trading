@@ -72,9 +72,10 @@ public class MarketPriceProvider {
 
         Stock stock =
                 stockRepository
-                        .findBySymbolAndExchange(
+                        .findListedBySymbolAndExchangeAsOf(
                                 normalizedSymbol,
-                                normalizedExchange
+                                normalizedExchange,
+                                observationDate
                         )
                         .orElseThrow(
                                 () ->

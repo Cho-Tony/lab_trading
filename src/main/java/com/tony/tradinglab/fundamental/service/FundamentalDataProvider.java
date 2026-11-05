@@ -1,6 +1,7 @@
 package com.tony.tradinglab.fundamental.service;
 
 import com.tony.tradinglab.fundamental.client.dto.FinancialStatementData;
+import com.tony.tradinglab.stock.domain.Stock;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,10 +37,11 @@ public class FundamentalDataProvider {
          * 먼저 해당 종목의 재무 데이터가
          * DB에 하나라도 존재하는지 확인한다.
          */
+        Stock stock = queryService.findStockAsOf(symbol, exchange, asOfDate);
+
         List<FinancialStatementData> stored =
                 queryService.findAll(
-                        symbol,
-                        exchange
+                        stock.getId()
                 );
 
 
@@ -62,8 +64,7 @@ public class FundamentalDataProvider {
          * 따라서 API 응답을 직접 분석에 사용하지 않는다.
          */
         return queryService.findAsOf(
-                symbol,
-                exchange,
+                stock.getId(),
                 asOfDate
         );
     }

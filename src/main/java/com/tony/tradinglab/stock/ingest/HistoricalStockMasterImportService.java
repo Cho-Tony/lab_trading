@@ -7,7 +7,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -103,37 +102,16 @@ public class HistoricalStockMasterImportService {
                             );
 
 
-            if (symbolMatches.size() > 1) {
+            // A different permanent ID from the same provider is a different
+            // security, even when the ticker/exchange happens to be identical.
+            // Unidentified or cross-provider matches need explicit reconciliation;
+            // ticker equality alone must never overwrite an existing identity.
+            boolean unresolvedIdentity = symbolMatches.stream().anyMatch(candidate ->
+                    !record.dataSource().equals(candidate.getDataSource())
+                            || !hasText(candidate.getSourceSecurityId()));
 
-                /*
-                 * V6 이후에는 ticker 재사용이 가능하므로
-                 * 여러 개면 임의로 하나를 선택하지 않는다.
-                 */
+            if (unresolvedIdentity) {
                 conflicts++;
-
-                continue;
-            }
-
-
-            if (symbolMatches.size() == 1) {
-
-                stock =
-                        symbolMatches.get(0);
-
-
-                applyHistoricalData(
-                        stock,
-                        record
-                );
-
-
-                stockRepository.save(
-                        stock
-                );
-
-
-                updated++;
-
                 continue;
             }
 

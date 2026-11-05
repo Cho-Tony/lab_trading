@@ -35,6 +35,15 @@ public class FinancialStatementQueryService {
                         exchange
                 );
 
+        return findAll(stock);
+    }
+
+    public List<FinancialStatementData> findAll(Long stockId) {
+        return findAll(findStockById(stockId));
+    }
+
+    private List<FinancialStatementData> findAll(Stock stock) {
+
 
         return financialStatementRepository
                 .findByStockIdOrderByPeriodEndDateAscFiledDateAsc(
@@ -69,10 +78,23 @@ public class FinancialStatementQueryService {
 
 
         Stock stock =
-                findStock(
+                findStockAsOf(
                         symbol,
-                        exchange
+                        exchange,
+                        asOfDate
                 );
+
+        return findAsOf(stock, asOfDate);
+    }
+
+    public List<FinancialStatementData> findAsOf(Long stockId, LocalDate asOfDate) {
+        if (asOfDate == null) {
+            throw new IllegalArgumentException("asOfDate는 필수입니다.");
+        }
+        return findAsOf(findStockById(stockId), asOfDate);
+    }
+
+    private List<FinancialStatementData> findAsOf(Stock stock, LocalDate asOfDate) {
 
 
         List<FinancialStatementData> statements =
@@ -140,10 +162,40 @@ public class FinancialStatementQueryService {
                 .toList();
     }
 
+    public Stock findStockAsOf(String symbol, String exchange, LocalDate asOfDate) {
+        validateSymbolAndExchange(symbol, exchange);
+        if (asOfDate == null) {
+            throw new IllegalArgumentException("asOfDate는 필수입니다.");
+        }
+        return stockRepository.findListedBySymbolAndExchangeAsOf(
+                        symbol.trim().toUpperCase(), exchange.trim().toUpperCase(), asOfDate)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Stock is not listed as of " + asOfDate + ": " + symbol + " / " + exchange));
+    }
+
+    private Stock findStockById(Long stockId) {
+        if (stockId == null) {
+            throw new IllegalArgumentException("stockId는 필수입니다.");
+        }
+        return stockRepository.findById(stockId)
+                .orElseThrow(() -> new IllegalStateException("Stock not found: stockId=" + stockId));
+    }
+
     private Stock findStock(
             String symbol,
             String exchange
     ) {
+        validateSymbolAndExchange(symbol, exchange);
+
+        String normalizedSymbol = symbol.trim().toUpperCase();
+        String normalizedExchange = exchange.trim().toUpperCase();
+
+        return stockRepository.findBySymbolAndExchange(normalizedSymbol, normalizedExchange)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Stock이 DB에 없습니다. " + normalizedSymbol + " / " + normalizedExchange));
+    }
+
+    private void validateSymbolAndExchange(String symbol, String exchange) {
 
         if (symbol == null
                 || symbol.isBlank()) {
@@ -163,30 +215,6 @@ public class FinancialStatementQueryService {
         }
 
 
-        String normalizedSymbol =
-                symbol.trim()
-                        .toUpperCase();
-
-        String normalizedExchange =
-                exchange.trim()
-                        .toUpperCase();
-
-
-        return stockRepository
-                .findBySymbolAndExchange(
-                        normalizedSymbol,
-                        normalizedExchange
-                )
-
-                .orElseThrow(
-                        () ->
-                                new IllegalStateException(
-                                        "Stock이 DB에 없습니다. "
-                                                + normalizedSymbol
-                                                + " / "
-                                                + normalizedExchange
-                                )
-                );
     }
 
 

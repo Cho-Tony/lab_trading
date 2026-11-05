@@ -4,7 +4,9 @@ import com.tony.tradinglab.fundamental.domain.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -14,7 +16,9 @@ class PointInTimeValuationInputAssemblerTest {
 
     private ValuationPeerSnapshotInputFactory inputFactory;
 
-    private PointInTimeValuationInputAssembler assembler;
+    private PointInTimeValuationAssembler valuationAssembler;
+
+    private PointInTimeValuationInputService service;
 
 
     @BeforeEach
@@ -26,8 +30,11 @@ class PointInTimeValuationInputAssemblerTest {
                 );
 
 
-        assembler =
-                new PointInTimeValuationInputAssembler(
+        valuationAssembler = mock(PointInTimeValuationAssembler.class);
+
+        service =
+                new PointInTimeValuationInputService(
+                        valuationAssembler,
                         inputFactory
                 );
     }
@@ -68,8 +75,8 @@ class PointInTimeValuationInputAssemblerTest {
                 );
 
 
-        PointInTimeValuationInputRequest request =
-                new PointInTimeValuationInputRequest(
+        PointInTimeValuationBuildRequest request =
+                buildRequest(
 
                         stockId,
                         symbol,
@@ -109,7 +116,7 @@ class PointInTimeValuationInputAssemblerTest {
 
 
         ValuationPeerSnapshotInput result =
-                assembler.assemble(
+                service.create(
                                 request
                         )
                         .orElseThrow();
@@ -156,8 +163,8 @@ class PointInTimeValuationInputAssemblerTest {
                 );
 
 
-        PointInTimeValuationInputRequest request =
-                new PointInTimeValuationInputRequest(
+        PointInTimeValuationBuildRequest request =
+                buildRequest(
 
                         1L,
                         "CRDO",
@@ -191,10 +198,12 @@ class PointInTimeValuationInputAssemblerTest {
 
 
         assertThat(
-                assembler.assemble(
+                service.create(
                         request
                 )
         ).isEmpty();
+
+        verify(inputFactory).create(1L, "CRDO", observationDate, valuation, null, null);
     }
 
 
@@ -202,14 +211,34 @@ class PointInTimeValuationInputAssemblerTest {
     void returnEmptyWhenRequestIsNull() {
 
         assertThat(
-                assembler.assemble(
+                service.create(
                         null
                 )
         ).isEmpty();
 
 
         verifyNoInteractions(
+                valuationAssembler,
                 inputFactory
         );
+    }
+
+    private PointInTimeValuationBuildRequest buildRequest(
+            Long stockId,
+            String symbol,
+            LocalDate observationDate,
+            ValuationMetrics valuation,
+            GrowthTrendAnalysis growth,
+            ProfitabilityTrendAnalysis profitability
+    ) {
+        TtmFinancials ttm = mock(TtmFinancials.class);
+        PointInTimeFundamentalAnalysis fundamental = new PointInTimeFundamentalAnalysis(
+                stockId, symbol, observationDate, ttm, growth, profitability);
+        PointInTimeValuationBuildRequest request = new PointInTimeValuationBuildRequest(
+                fundamental, BigDecimal.ONE, List.of(), List.of());
+
+        when(valuationAssembler.assemble(observationDate, request.sharePrice(), List.of(ttm),
+                request.cashFlows(), request.sharesFacts())).thenReturn(Optional.of(valuation));
+        return request;
     }
 }

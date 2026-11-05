@@ -85,9 +85,11 @@ public class MarketDataSyncService {
 
         Stock stock =
                 stockRepository
-                        .findBySymbolAndExchange(
+                        .findListedBySymbolAndExchangeForRange(
                                 symbol,
-                                exchange
+                                exchange,
+                                startDate,
+                                endDate
                         )
 
                         .orElseThrow(
@@ -284,9 +286,11 @@ public class MarketDataSyncService {
 
         Stock stock =
                 stockRepository
-                        .findBySymbolAndExchange(
+                        .findListedBySymbolAndExchangeForRange(
                                 normalizedSymbol,
-                                normalizedExchange
+                                normalizedExchange,
+                                startDate,
+                                endDate
                         )
                         .orElseThrow(
                                 () ->

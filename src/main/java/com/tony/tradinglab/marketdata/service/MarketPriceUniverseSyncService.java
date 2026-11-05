@@ -98,9 +98,11 @@ public class MarketPriceUniverseSyncService {
 
             Stock stock =
                     stockRepository
-                            .findBySymbolAndExchange(
+                            .findListedBySymbolAndExchangeForRange(
                                     symbol,
-                                    exchange
+                                    exchange,
+                                    startDate,
+                                    endDate
                             )
                             .orElseThrow(
                                     () ->

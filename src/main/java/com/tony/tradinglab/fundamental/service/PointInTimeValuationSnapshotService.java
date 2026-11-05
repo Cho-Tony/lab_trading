@@ -67,9 +67,10 @@ public class PointInTimeValuationSnapshotService {
          */
         Optional<Stock> stockOptional =
                 stockRepository
-                        .findBySymbolAndExchange(
+                        .findListedBySymbolAndExchangeAsOf(
                                 normalizedSymbol,
-                                normalizedExchange
+                                normalizedExchange,
+                                observationDate
                         );
 
 

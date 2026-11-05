@@ -13,11 +13,10 @@ import static lombok.AccessLevel.PROTECTED;
 @Entity
 @Table(
         name = "stocks",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_stocks_symbol_exchange",
-                        columnNames = {"symbol", "exchange"}
-                )
+        indexes = {
+                @Index(name = "idx_stocks_symbol_exchange", columnList = "symbol, exchange"),
+                @Index(name = "idx_stocks_listing_window", columnList = "listing_start_date, listing_end_date"),
+                @Index(name = "idx_stocks_source_security", columnList = "data_source, source_security_id")
         }
 )
 @NoArgsConstructor(access = PROTECTED)
@@ -39,7 +38,7 @@ public class Stock {
     @Column(length = 30)
     private String market;
 
-    @Column(nullable = false, length = 3)
+    @Column(nullable = false, length = 3, columnDefinition = "char(3)")
     private String currency;
 
     @Column(nullable = false)
