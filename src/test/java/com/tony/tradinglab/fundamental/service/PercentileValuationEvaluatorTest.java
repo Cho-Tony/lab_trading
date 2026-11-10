@@ -39,63 +39,10 @@ class PercentileValuationEvaluatorTest {
 
 
         List<ValuationPeerSnapshot> peers =
-                new ArrayList<>();
+                tenPeers(date);
 
-
-        peers.add(
-                snapshot(
-                        2L,
-                        "A",
-                        "10",
-                        "2",
-                        "15",
-                        date
-                )
-        );
-
-        peers.add(
-                snapshot(
-                        3L,
-                        "B",
-                        "15",
-                        "3",
-                        "20",
-                        date
-                )
-        );
-
-        peers.add(
-                snapshot(
-                        4L,
-                        "C",
-                        "20",
-                        "4",
-                        "25",
-                        date
-                )
-        );
-
-        peers.add(
-                snapshot(
-                        5L,
-                        "D",
-                        "25",
-                        "6",
-                        "30",
-                        date
-                )
-        );
-
-        peers.add(
-                snapshot(
-                        6L,
-                        "E",
-                        "30",
-                        "8",
-                        "35",
-                        date
-                )
-        );
+        assertThat(peers).extracting(ValuationPeerSnapshot::stockId)
+                .doesNotHaveDuplicates().doesNotContain(target.stockId());
 
 
         PeerUniverse universe =
@@ -111,6 +58,10 @@ class PercentileValuationEvaluatorTest {
                 evaluator.evaluate(
                         universe
                 );
+
+        assertThat(result.validPePeerCount()).isEqualTo(10);
+        assertThat(result.validPsPeerCount()).isEqualTo(10);
+        assertThat(result.validPriceToFcfPeerCount()).isEqualTo(10);
 
 
         System.out.println(
@@ -134,10 +85,10 @@ class PercentileValuationEvaluatorTest {
          *
          * Target = 20
          *
-         * lower = 10,15     → 2
-         * equal = 20        → 1
+         * lower = 10,15 (각 2개) → 4
+         * equal = 20 (2개)       → 2
          *
-         * (2 + 0.5) / 5
+         * (4 + 2 / 2) / 10
          * = 50%
          */
         assertThat(
@@ -152,9 +103,9 @@ class PercentileValuationEvaluatorTest {
          *
          * Target = 5
          *
-         * lower = 2,3,4
+         * lower = 2,3,4 (각 2개) → 6
          *
-         * 3 / 5
+         * 6 / 10
          * = 60%
          */
         assertThat(
@@ -169,10 +120,10 @@ class PercentileValuationEvaluatorTest {
          *
          * Target = 25
          *
-         * lower = 15,20
-         * equal = 25
+         * lower = 15,20 (각 2개) → 4
+         * equal = 25 (2개)       → 2
          *
-         * (2 + 0.5) / 5
+         * (4 + 2 / 2) / 10
          * = 50%
          */
         assertThat(
@@ -180,6 +131,39 @@ class PercentileValuationEvaluatorTest {
         ).isEqualByComparingTo(
                 "50.00"
         );
+    }
+
+    @Test
+    void rejectMetricsWithNineValidPeersEvenWhenUniverseHasTen() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationPeerSnapshot target = snapshot(1L, "TARGET", "20", "5", "25", date);
+        List<ValuationPeerSnapshot> peers = tenPeers(date);
+        peers.set(9, snapshot(11L, "INVALID", "0", "8", "-1", date));
+
+        PercentileValuationAssessment result = evaluator.evaluate(
+                new PeerUniverse(target, peers, PeerSelectionLevel.INDUSTRY_AND_SIZE));
+
+        assertThat(peers).hasSize(10);
+        assertThat(result.validPePeerCount()).isEqualTo(9);
+        assertThat(result.validPsPeerCount()).isEqualTo(10);
+        assertThat(result.validPriceToFcfPeerCount()).isEqualTo(9);
+        assertThat(result.pePercentile()).isNull();
+        assertThat(result.priceToFcfPercentile()).isNull();
+        assertThat(result.psPercentile()).isEqualByComparingTo("60.00");
+    }
+
+    private List<ValuationPeerSnapshot> tenPeers(LocalDate date) {
+        // Two distinct securities per original tuple preserve the mid-rank percentiles.
+        String[][] multiples = {
+                {"10", "2", "15"}, {"15", "3", "20"}, {"20", "4", "25"},
+                {"25", "6", "30"}, {"30", "8", "35"}
+        };
+        List<ValuationPeerSnapshot> peers = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            String[] values = multiples[i % multiples.length];
+            peers.add(snapshot(i + 2L, "PEER_" + i, values[0], values[1], values[2], date));
+        }
+        return peers;
     }
 
 

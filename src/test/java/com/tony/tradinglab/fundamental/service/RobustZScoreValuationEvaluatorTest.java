@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,53 +41,10 @@ class RobustZScoreValuationEvaluatorTest {
 
 
         List<ValuationPeerSnapshot> peers =
-                List.of(
+                tenPeers(date);
 
-                        snapshot(
-                                2L,
-                                "A",
-                                "10",
-                                "2",
-                                "15",
-                                date
-                        ),
-
-                        snapshot(
-                                3L,
-                                "B",
-                                "15",
-                                "3",
-                                "20",
-                                date
-                        ),
-
-                        snapshot(
-                                4L,
-                                "C",
-                                "20",
-                                "4",
-                                "25",
-                                date
-                        ),
-
-                        snapshot(
-                                5L,
-                                "D",
-                                "25",
-                                "6",
-                                "30",
-                                date
-                        ),
-
-                        snapshot(
-                                6L,
-                                "E",
-                                "30",
-                                "8",
-                                "35",
-                                date
-                        )
-                );
+        assertThat(peers).extracting(ValuationPeerSnapshot::stockId)
+                .doesNotHaveDuplicates().doesNotContain(target.stockId());
 
 
         PeerUniverse universe =
@@ -104,6 +62,10 @@ class RobustZScoreValuationEvaluatorTest {
                 evaluator.evaluate(
                         universe
                 );
+
+        assertThat(result.pe().validPeerCount()).isEqualTo(10);
+        assertThat(result.ps().validPeerCount()).isEqualTo(10);
+        assertThat(result.priceToFcf().validPeerCount()).isEqualTo(10);
 
 
         System.out.println(
@@ -170,7 +132,7 @@ class RobustZScoreValuationEvaluatorTest {
          * P/S
          *
          * Peer:
-         * 2,3,4,6,8
+         * 2,2,3,3,4,4,6,6,8,8
          *
          * Median = 4
          * MAD = 2
@@ -223,35 +185,14 @@ class RobustZScoreValuationEvaluatorTest {
 
 
         List<ValuationPeerSnapshot> peers =
-                List.of(
+                new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            peers.add(snapshot(i + 2L, "ZERO_MAD_" + i, "20",
+                    Integer.toString(3 + i % 3), "20", date));
+        }
 
-                        snapshot(
-                                2L,
-                                "A",
-                                "20",
-                                "3",
-                                "20",
-                                date
-                        ),
-
-                        snapshot(
-                                3L,
-                                "B",
-                                "20",
-                                "4",
-                                "20",
-                                date
-                        ),
-
-                        snapshot(
-                                4L,
-                                "C",
-                                "20",
-                                "5",
-                                "20",
-                                date
-                        )
-                );
+        assertThat(peers).extracting(ValuationPeerSnapshot::stockId)
+                .doesNotHaveDuplicates().doesNotContain(target.stockId());
 
 
         PeerUniverse universe =
@@ -279,6 +220,8 @@ class RobustZScoreValuationEvaluatorTest {
          *
          * Robust Z 계산 불가능
          */
+        assertThat(result.pe().validPeerCount()).isEqualTo(10);
+        assertThat(result.pe().median()).isEqualByComparingTo("20");
         assertThat(
                 result.pe().mad()
         ).isEqualByComparingTo(
@@ -289,6 +232,43 @@ class RobustZScoreValuationEvaluatorTest {
         assertThat(
                 result.pe().robustZScore()
         ).isNull();
+    }
+
+    @Test
+    void rejectMetricsWithNineValidPeersEvenWhenUniverseHasTen() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationPeerSnapshot target = snapshot(1L, "TARGET", "12", "5", "25", date);
+        List<ValuationPeerSnapshot> peers = tenPeers(date);
+        peers.set(9, snapshot(11L, "INVALID", "0", "8", "-1", date));
+
+        RobustZScoreValuationAssessment result = evaluator.evaluate(
+                new PeerUniverse(target, peers, PeerSelectionLevel.INDUSTRY_AND_SIZE));
+
+        assertThat(peers).hasSize(10);
+        assertThat(result.pe().validPeerCount()).isEqualTo(9);
+        assertThat(result.pe().median()).isNull();
+        assertThat(result.pe().mad()).isNull();
+        assertThat(result.pe().robustZScore()).isNull();
+        assertThat(result.priceToFcf().validPeerCount()).isEqualTo(9);
+        assertThat(result.priceToFcf().median()).isNull();
+        assertThat(result.priceToFcf().mad()).isNull();
+        assertThat(result.priceToFcf().robustZScore()).isNull();
+        assertThat(result.ps().validPeerCount()).isEqualTo(10);
+        assertThat(result.ps().robustZScore()).isEqualByComparingTo("0.3372");
+    }
+
+    private List<ValuationPeerSnapshot> tenPeers(LocalDate date) {
+        // Duplicating each value across distinct securities preserves Median and MAD.
+        String[][] multiples = {
+                {"10", "2", "15"}, {"15", "3", "20"}, {"20", "4", "25"},
+                {"25", "6", "30"}, {"30", "8", "35"}
+        };
+        List<ValuationPeerSnapshot> peers = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            String[] values = multiples[i % multiples.length];
+            peers.add(snapshot(i + 2L, "PEER_" + i, values[0], values[1], values[2], date));
+        }
+        return peers;
     }
 
 

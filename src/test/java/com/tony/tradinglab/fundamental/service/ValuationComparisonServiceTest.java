@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,96 +69,10 @@ class ValuationComparisonServiceTest {
 
 
         List<ValuationPeerSnapshot> peers =
-                List.of(
+                twentyFourPeers(date);
 
-                        snapshot(
-                                2L,
-                                "A",
-                                "12",
-                                "3.5",
-                                "15",
-                                "10",
-                                "8",
-                                date
-                        ),
-
-                        snapshot(
-                                3L,
-                                "B",
-                                "15",
-                                "5",
-                                "18",
-                                "20",
-                                "9",
-                                date
-                        ),
-
-                        snapshot(
-                                4L,
-                                "C",
-                                "18",
-                                "6.5",
-                                "20",
-                                "25",
-                                "15",
-                                date
-                        ),
-
-                        snapshot(
-                                5L,
-                                "D",
-                                "20",
-                                "8",
-                                "25",
-                                "35",
-                                "17",
-                                date
-                        ),
-
-                        snapshot(
-                                6L,
-                                "E",
-                                "25",
-                                "10",
-                                "30",
-                                "45",
-                                "21",
-                                date
-                        ),
-
-                        snapshot(
-                                7L,
-                                "F",
-                                "30",
-                                "13",
-                                "35",
-                                "55",
-                                "24",
-                                date
-                        ),
-
-                        snapshot(
-                                8L,
-                                "G",
-                                "35",
-                                "15",
-                                "40",
-                                "65",
-                                "23",
-                                date
-                        ),
-
-                        snapshot(
-                                9L,
-                                "H",
-                                "40",
-                                "18",
-                                "45",
-                                "70",
-                                "30",
-                                date
-                        )
-                );
+        assertThat(peers).extracting(ValuationPeerSnapshot::stockId)
+                .doesNotHaveDuplicates().doesNotContain(target.stockId());
 
 
         PeerUniverse universe =
@@ -241,19 +156,19 @@ class ValuationComparisonServiceTest {
 
         assertThat(
                 result.peerCount()
-        ).isEqualTo(8);
+        ).isEqualTo(24);
 
 
         /*
          * Target P/S = 8
          *
          * Peer:
-         * 3.5, 5, 6.5, 8, 10, 13, 15, 18
+         * Original 8 peers plus 7 below 8 and 9 above 8.
          *
-         * lower = 3
+         * lower = 10
          * equal = 1
          *
-         * (3 + 0.5) / 8
+         * (10 + 0.5) / 24
          * = 43.75%
          */
         assertThat(
@@ -267,6 +182,15 @@ class ValuationComparisonServiceTest {
         assertThat(
                 result.robustZScore()
         ).isNotNull();
+
+        assertThat(result.percentile().validPePeerCount()).isEqualTo(24);
+        assertThat(result.percentile().validPsPeerCount()).isEqualTo(24);
+        assertThat(result.percentile().validPriceToFcfPeerCount()).isEqualTo(24);
+        assertThat(result.robustZScore().ps().validPeerCount()).isEqualTo(24);
+        // Sorted PS positions 12/13 are 9/10; absolute-deviation positions 12/13 are 4.5/5.5.
+        assertThat(result.robustZScore().ps().median()).isEqualByComparingTo("9.5");
+        assertThat(result.robustZScore().ps().mad()).isEqualByComparingTo("5");
+        assertThat(result.robustZScore().ps().robustZScore()).isEqualByComparingTo("-0.2023");
 
 
         /*
@@ -283,6 +207,85 @@ class ValuationComparisonServiceTest {
         ).isEqualTo(
                 RegressionValuationMetric.PS
         );
+
+        assertThat(result.regressionAdjusted().peerCount()).isEqualTo(24);
+        assertThat(result.regressionAdjusted().predictedMultiple()).isPositive();
+        assertThat(result.regressionAdjusted().rSquared()).isNotNull();
+    }
+
+    @Test
+    void rejectPercentileAndRobustStatisticsWithNineValidPeers() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationComparisonResult result = service.compare(
+                new PeerUniverse(target(date), twentyFourPeers(date).subList(0, 9),
+                        PeerSelectionLevel.INDUSTRY_AND_SIZE), RegressionValuationMetric.PS);
+
+        assertThat(result.peerCount()).isEqualTo(9);
+        assertThat(result.percentile().validPsPeerCount()).isEqualTo(9);
+        assertThat(result.percentile().psPercentile()).isNull();
+        assertThat(result.robustZScore().ps().validPeerCount()).isEqualTo(9);
+        assertThat(result.robustZScore().ps().median()).isNull();
+        assertThat(result.robustZScore().ps().mad()).isNull();
+        assertThat(result.robustZScore().ps().robustZScore()).isNull();
+        assertThat(result.regressionAdjusted()).isNull();
+    }
+
+    @Test
+    void rejectOnlyRegressionWithNineteenValidPeers() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationComparisonResult result = service.compare(
+                new PeerUniverse(target(date), twentyFourPeers(date).subList(0, 19),
+                        PeerSelectionLevel.INDUSTRY_AND_SIZE), RegressionValuationMetric.PS);
+
+        assertThat(result.peerCount()).isEqualTo(19);
+        // Ten PS values below 8 and one equal: (10 + 0.5) / 19 * 100 = 55.26.
+        assertThat(result.percentile().psPercentile()).isEqualByComparingTo("55.26");
+        assertThat(result.robustZScore().ps().robustZScore()).isNotNull();
+        assertThat(result.regressionAdjusted()).isNull();
+    }
+
+    @Test
+    void acceptAllMethodsWithExactlyTwentyValidPeers() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationComparisonResult result = service.compare(
+                new PeerUniverse(target(date), twentyFourPeers(date).subList(0, 20),
+                        PeerSelectionLevel.INDUSTRY_AND_SIZE), RegressionValuationMetric.PS);
+
+        assertThat(result.peerCount()).isEqualTo(20);
+        // (10 + 0.5) / 20 * 100 = 52.50.
+        assertThat(result.percentile().psPercentile()).isEqualByComparingTo("52.50");
+        assertThat(result.robustZScore().ps().robustZScore()).isNotNull();
+        assertThat(result.regressionAdjusted()).isNotNull();
+        assertThat(result.regressionAdjusted().peerCount()).isEqualTo(20);
+        assertThat(result.regressionAdjusted().predictedMultiple()).isPositive();
+        assertThat(result.regressionAdjusted().rSquared()).isNotNull();
+    }
+
+    private ValuationPeerSnapshot target(LocalDate date) {
+        return snapshot(1L, "TARGET", "20", "8", "25", "40", "20", date);
+    }
+
+    private List<ValuationPeerSnapshot> twentyFourPeers(LocalDate date) {
+        String[][] original = {
+                {"12", "3.5", "15", "10", "8"}, {"15", "5", "18", "20", "9"},
+                {"18", "6.5", "20", "25", "15"}, {"20", "8", "25", "35", "17"},
+                {"25", "10", "30", "45", "21"}, {"30", "13", "35", "55", "24"},
+                {"35", "15", "40", "65", "23"}, {"40", "18", "45", "70", "30"}
+        };
+        List<ValuationPeerSnapshot> peers = new ArrayList<>();
+        for (int i = 0; i < original.length; i++) {
+            String[] row = original[i];
+            peers.add(snapshot(i + 2L, "PEER_" + i, row[0], row[1], row[2], row[3], row[4], date));
+        }
+        String[] extraPs = {"1", "2", "3", "4", "5.5", "6", "7",
+                "9", "11", "12", "14", "16", "17", "19", "20", "22"};
+        // A 4 x 4 growth/margin grid ensures the regression design matrix has full column rank.
+        for (int i = 0; i < extraPs.length; i++) {
+            peers.add(snapshot(i + 10L, "EXTRA_" + i,
+                    Integer.toString(12 + i), extraPs[i], Integer.toString(15 + i),
+                    Integer.toString(12 + 10 * (i / 4)), Integer.toString(5 + 5 * (i % 4)), date));
+        }
+        return peers;
     }
 
 

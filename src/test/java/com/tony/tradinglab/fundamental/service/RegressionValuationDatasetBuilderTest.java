@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,44 +44,10 @@ class RegressionValuationDatasetBuilderTest {
 
 
         List<ValuationPeerSnapshot> peers =
-                List.of(
+                twentyPeers(date);
 
-                        snapshot(
-                                2L,
-                                "A",
-                                "4",
-                                "10",
-                                "5",
-                                date
-                        ),
-
-                        snapshot(
-                                3L,
-                                "B",
-                                "6",
-                                "20",
-                                "10",
-                                date
-                        ),
-
-                        snapshot(
-                                4L,
-                                "C",
-                                "8",
-                                "30",
-                                "15",
-                                date
-                        ),
-
-                        snapshot(
-                                5L,
-                                "D",
-                                "12",
-                                "50",
-                                "25",
-                                date
-                        )
-                );
+        assertThat(peers).extracting(ValuationPeerSnapshot::stockId)
+                .doesNotHaveDuplicates().doesNotContain(target.stockId());
 
 
         PeerUniverse universe =
@@ -148,7 +115,11 @@ class RegressionValuationDatasetBuilderTest {
 
         assertThat(
                 dataset.peerFeatures()
-        ).hasSize(4);
+        ).hasSize(20);
+
+        assertThat(dataset.peerCount()).isEqualTo(20);
+        assertThat(dataset.target().valuationMultiple()).isEqualByComparingTo("10");
+        assertThat(dataset.target().operatingMarginPct()).isEqualByComparingTo("20");
 
 
         assertThat(
@@ -157,6 +128,45 @@ class RegressionValuationDatasetBuilderTest {
         ).isEqualByComparingTo(
                 "40"
         );
+    }
+
+    @Test
+    void rejectNineteenValidPeersWithoutCountingTarget() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationPeerSnapshot target = snapshot(1L, "TARGET", "10", "40", "20", date);
+        List<ValuationPeerSnapshot> peers = twentyPeers(date).subList(0, 19);
+
+        assertThat(builder.build(new PeerUniverse(target, peers, PeerSelectionLevel.INDUSTRY_AND_SIZE),
+                RegressionValuationMetric.PS)).isEmpty();
+    }
+
+    @Test
+    void rejectTwentyRawPeersWhenOnlyNineteenHaveValidFeatures() {
+        LocalDate date = LocalDate.of(2025, 11, 5);
+        ValuationPeerSnapshot target = snapshot(1L, "TARGET", "10", "40", "20", date);
+        List<ValuationPeerSnapshot> peers = twentyPeers(date);
+        peers.set(19, snapshot(21L, "INVALID_PS", "0", "50", "25", date));
+
+        assertThat(peers).hasSize(20);
+        assertThat(builder.build(new PeerUniverse(target, peers, PeerSelectionLevel.INDUSTRY_AND_SIZE),
+                RegressionValuationMetric.PS)).isEmpty();
+    }
+
+    private List<ValuationPeerSnapshot> twentyPeers(LocalDate date) {
+        int[] growthRates = {10, 20, 30, 50};
+        int[] margins = {5, 10, 15, 20, 25};
+        List<ValuationPeerSnapshot> peers = new ArrayList<>();
+        // A Cartesian grid makes growth and margin independent rather than margin = growth / 2.
+        for (int growthIndex = 0; growthIndex < growthRates.length; growthIndex++) {
+            for (int marginIndex = 0; marginIndex < margins.length; marginIndex++) {
+                long id = peers.size() + 2L;
+                peers.add(snapshot(id, "PEER_" + id,
+                        Integer.toString(4 + 2 * growthIndex + marginIndex),
+                        Integer.toString(growthRates[growthIndex]),
+                        Integer.toString(margins[marginIndex]), date));
+            }
+        }
+        return peers;
     }
 
 
