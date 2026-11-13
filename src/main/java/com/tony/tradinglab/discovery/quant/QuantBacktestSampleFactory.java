@@ -26,6 +26,7 @@ public class QuantBacktestSampleFactory {
     ) {
 
         if (candidate == null
+                || candidate.stockId() == null
                 || candidate.symbol() == null
                 || candidate.symbol().isBlank()
                 || candidate.observationDate() == null
@@ -37,15 +38,7 @@ public class QuantBacktestSampleFactory {
         }
 
 
-        String symbol =
-                candidate.symbol()
-                        .trim()
-                        .toUpperCase();
-
-
-        String normalizedExchange =
-                exchange.trim()
-                        .toUpperCase();
+        Long stockId = candidate.stockId();
 
 
         /*
@@ -57,8 +50,7 @@ public class QuantBacktestSampleFactory {
         var entryPriceOptional =
                 marketPriceProvider
                         .getAsOf(
-                                symbol,
-                                normalizedExchange,
+                                stockId,
                                 candidate.observationDate()
                         );
 
@@ -88,8 +80,7 @@ public class QuantBacktestSampleFactory {
          */
         HorizonResult threeMonth =
                 resolveHorizon(
-                        symbol,
-                        normalizedExchange,
+                        stockId,
                         candidate.observationDate()
                                 .plusMonths(3),
                         entryPrice
@@ -98,8 +89,7 @@ public class QuantBacktestSampleFactory {
 
         HorizonResult sixMonth =
                 resolveHorizon(
-                        symbol,
-                        normalizedExchange,
+                        stockId,
                         candidate.observationDate()
                                 .plusMonths(6),
                         entryPrice
@@ -108,8 +98,7 @@ public class QuantBacktestSampleFactory {
 
         HorizonResult twelveMonth =
                 resolveHorizon(
-                        symbol,
-                        normalizedExchange,
+                        stockId,
                         candidate.observationDate()
                                 .plusMonths(12),
                         entryPrice
@@ -159,8 +148,7 @@ public class QuantBacktestSampleFactory {
 
 
     private HorizonResult resolveHorizon(
-            String symbol,
-            String exchange,
+            Long stockId,
             LocalDate targetDate,
             BigDecimal entryPrice
     ) {
@@ -168,8 +156,7 @@ public class QuantBacktestSampleFactory {
         var priceOptional =
                 marketPriceProvider
                         .getAsOf(
-                                symbol,
-                                exchange,
+                                stockId,
                                 targetDate
                         );
 

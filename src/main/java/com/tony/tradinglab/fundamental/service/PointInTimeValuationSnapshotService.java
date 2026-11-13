@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +43,16 @@ public class PointInTimeValuationSnapshotService {
             String exchange,
             LocalDate observationDate
     ) {
+        return analyze(symbol, exchange, observationDate, FundamentalDataCollectionPolicy.AUTO_SYNC_IF_EMPTY);
+    }
+
+    public Optional<ValuationPeerSnapshotInput> analyze(
+            String symbol,
+            String exchange,
+            LocalDate observationDate,
+            FundamentalDataCollectionPolicy collectionPolicy
+    ) {
+        Objects.requireNonNull(collectionPolicy, "collectionPolicy is required");
 
         if (symbol == null
                 || symbol.isBlank()
@@ -92,7 +103,8 @@ public class PointInTimeValuationSnapshotService {
                         .getAsOf(
                                 normalizedSymbol,
                                 normalizedExchange,
-                                observationDate
+                                observationDate,
+                                collectionPolicy
                         );
 
 

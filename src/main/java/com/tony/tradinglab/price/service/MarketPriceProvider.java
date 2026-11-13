@@ -88,6 +88,22 @@ public class MarketPriceProvider {
                         );
 
 
+        return getAsOf(stock.getId(), observationDate);
+    }
+
+
+    /** 조회 기간 전체에서 동일한 증권의 stockId를 유지한다. Ticker로 재식별하지 않는다. */
+    public Optional<StockPrice> getAsOf(
+            Long stockId,
+            LocalDate observationDate
+    ) {
+        if (stockId == null) {
+            throw new IllegalArgumentException("stockId는 필수입니다.");
+        }
+        if (observationDate == null) {
+            throw new IllegalArgumentException("observationDate는 필수입니다.");
+        }
+
         /*
          * MarketPriceProvider는 조회만 담당한다.
          *
@@ -97,7 +113,7 @@ public class MarketPriceProvider {
         Optional<StockPrice> stored =
                 stockPriceRepository
                         .findTopByStockIdAndTradeDateLessThanEqualOrderByTradeDateDesc(
-                                stock.getId(),
+                                stockId,
                                 observationDate
                         );
 

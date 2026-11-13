@@ -1,6 +1,7 @@
 package com.tony.tradinglab.discovery.quant;
 
 import com.tony.tradinglab.universe.UniverseTarget;
+import com.tony.tradinglab.fundamental.domain.FundamentalDataCollectionPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -71,7 +72,8 @@ public class QuantBacktestService {
         List<QuantDiscoveryCandidate> candidates =
                 quantDiscoveryEngine
                         .discover(
-                                observationDate
+                                observationDate,
+                                FundamentalDataCollectionPolicy.READ_ONLY
                         );
 
 

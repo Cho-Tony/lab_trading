@@ -2,6 +2,7 @@ package com.tony.tradinglab.discovery.quant;
 
 import com.tony.tradinglab.fundamental.domain.ValuationComparisonResult;
 import com.tony.tradinglab.fundamental.domain.ValuationPeerSnapshotInput;
+import com.tony.tradinglab.fundamental.domain.FundamentalDataCollectionPolicy;
 import com.tony.tradinglab.fundamental.service.PointInTimeValuationComparisonService;
 import com.tony.tradinglab.fundamental.service.PointInTimeValuationSnapshotService;
 import com.tony.tradinglab.universe.UniverseTarget;
@@ -13,6 +14,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -33,8 +35,10 @@ public class DefaultQuantDiscoveryEngine
 
     @Override
     public List<QuantDiscoveryCandidate> discover(
-            LocalDate observationDate
+            LocalDate observationDate,
+            FundamentalDataCollectionPolicy collectionPolicy
     ) {
+        Objects.requireNonNull(collectionPolicy, "collectionPolicy is required");
 
         if (observationDate == null) {
             return List.of();
@@ -73,7 +77,8 @@ public class DefaultQuantDiscoveryEngine
                         .analyze(
                                 target.symbol(),
                                 target.exchange(),
-                                observationDate
+                                observationDate,
+                                collectionPolicy
                         )
 
                         .ifPresentOrElse(
@@ -82,9 +87,10 @@ public class DefaultQuantDiscoveryEngine
                                 () ->
                                         log.debug(
                                                 "Quant discovery snapshot unavailable. "
-                                                        + "symbol={} observationDate={}",
+                                                        + "reason=SNAPSHOT_UNAVAILABLE symbol={} observationDate={} policy={}",
                                                 target.symbol(),
-                                                observationDate
+                                                observationDate,
+                                                collectionPolicy
                                         )
                         );
 
@@ -96,9 +102,10 @@ public class DefaultQuantDiscoveryEngine
                  */
                 log.warn(
                         "Quant discovery snapshot failed. "
-                                + "symbol={} observationDate={} message={}",
+                                + "reason=SNAPSHOT_FAILED symbol={} observationDate={} policy={} message={}",
                         target.symbol(),
                         observationDate,
+                        collectionPolicy,
                         e.getMessage()
                 );
             }

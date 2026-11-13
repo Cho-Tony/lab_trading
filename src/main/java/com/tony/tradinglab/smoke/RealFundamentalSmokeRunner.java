@@ -105,7 +105,8 @@ public class RealFundamentalSmokeRunner
                     .analyze(
                             target.symbol(),
                             target.exchange(),
-                            observationDate
+                            observationDate,
+                            FundamentalDataCollectionPolicy.READ_ONLY
                     )
                     .ifPresent(
                             inputs::add
@@ -993,7 +994,8 @@ public class RealFundamentalSmokeRunner
 
         List<QuantDiscoveryCandidate> candidates =
                 quantDiscoveryEngine.discover(
-                        observationDate
+                        observationDate,
+                        FundamentalDataCollectionPolicy.READ_ONLY
                 );
 
 
